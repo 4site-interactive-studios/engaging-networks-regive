@@ -152,12 +152,64 @@ export class Regive {
     });
   }
 
+  private celebrate() {
+    this.log("Celebrating the donation", "🎉");
+    const confetti = this.options?.confetti
+      ? this.options.confetti === true
+        ? ["#FF0000", "#00FF00", "#0000FF"]
+        : this.options.confetti.split(",")
+      : [];
+    this.log("Confetti colors", "🎨", { confetti });
+    // TODO: Implement confetti celebration
+  }
+
   private addCustomBanner() {
     this.log("Adding a custom banner to the page");
+
+    const amounts = this.options?.amount?.split(",") || ["5"];
+    const bgColor = this.options?.bgColor || "#FFF";
+    const txtColor = this.options?.txtColor || "#333";
+    const buttonBgColor = this.options?.buttonBgColor || "#007BFF";
+    const buttonTxtColor = this.options?.buttonTxtColor || "#FFF";
+    const heading = this.options?.heading || null;
+    const theme = this.options?.theme || "stacked";
+    const currencySymbol = this.ENgrid.getCurrencySymbol();
+
+    const template = `
+    <style>
+      .regive-banner {
+        background-color: ${bgColor};
+        color: ${txtColor};
+      }
+      .regive-heading {
+        color: ${txtColor};
+      }
+      .regive-amount-btn {
+        background-color: ${buttonBgColor};
+        color: ${buttonTxtColor};
+      }
+      .regive-amount-btn:hover {
+        background-color: ${buttonBgColor}CC;
+      }
+      .regive-amount-btn:active {
+        background-color: ${buttonBgColor}AA;
+      }
+    </style>
+    <div class="regive-banner" data-theme="${theme}">
+      ${heading ? `<h1 class="regive-heading">${heading}</h1>` : ""}
+      <div class="regive-amounts">
+        ${amounts
+          .map((amount) => {
+            return `<button class="regive-amount-btn" data-amount="${amount.trim()}"><span class="regive-currency">${currencySymbol}</span><span class="regive-amount">${amount.trim()}</span></button>`;
+          })
+          .join("")}
+      </div>
+      </div>
+    `;
+
     const banner = document.createElement("div");
-    banner.classList.add("regive-banner");
+    banner.innerHTML = template;
     document.body.appendChild(banner);
-    // TODO: Implement the banner content
   }
 
   private wasSubmittedViaRegive(): boolean {
@@ -322,9 +374,19 @@ export class Regive {
     const attributes = regiveTag.attributes;
     const options: Record<string, string> = {};
 
+    const srcParams = new URLSearchParams();
+
     // Convert attributes to key-value pairs
     for (let i = 0; i < attributes.length; i++) {
       const attr = attributes[i];
+      if (attr.name === "params") {
+        // params is something like "key1=value1&key2=value2"
+        const params = new URLSearchParams(attr.value);
+        params.forEach((value, key) => {
+          srcParams.append(key, value);
+        });
+        continue;
+      }
       options[`regive-` + attr.name] = attr.value;
     }
 
@@ -333,6 +395,11 @@ export class Regive {
     // Convert options to URL parameters
     const urlParams = new URLSearchParams();
     Object.entries(options).forEach(([key, value]) => {
+      urlParams.append(key, value);
+    });
+
+    // Append the srcParams to the urlParams
+    srcParams.forEach((value, key) => {
       urlParams.append(key, value);
     });
 

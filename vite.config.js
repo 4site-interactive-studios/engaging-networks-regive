@@ -44,6 +44,7 @@ export default defineConfig({
  *  //                                                //
  *  //            Created by 4Site Studios            //
  *  //     www.4sitestudios.com/engaging-networks     //
+ *  //                                                //
  *  ////////////////////////////////////////////////////
  *
  */`,
