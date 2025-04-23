@@ -1,0 +1,21 @@
+{
+  "name": "engaging-networks-regive",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:prod": "tsc && vite build && npm exec terser -- -c -m --module dist/regive.js > dist/regive.min.js",
+    "watch": "vite build --watch"
+  },
+  "devDependencies": {
+    "browserslist-to-esbuild": "^2.1.1",
+    "sass-embedded": "^1.86.3",
+    "terser": "^5.39.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.3.1",
+    "vite-plugin-banner": "^0.8.1",
+    "vite-plugin-css-injected-by-js": "^3.5.2"
+  }
+}
