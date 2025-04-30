@@ -29,8 +29,8 @@ export default defineConfig({
  *  //                                                //
  *  //            Engaging Networks Regive            //
  *  //                                                //
- *  //               By Fernando Santos               //
- *  //        <(fernando[at]4sitestudios.com)>        //
+ *  //            Fernando Santos [<(🔵)>]            //
+ *  //          fernando[at]4sitestudios.com          //
  *  //                                                //
  *  //        Build Date:  ${new Date().toLocaleDateString("en-US", {
    year: "numeric",
@@ -40,7 +40,6 @@ export default defineConfig({
         hour: "2-digit",
         minute: "2-digit",
       })}        //
- *  //                                                //
  *  //                                                //
  *  //            Created by 4Site Studios            //
  *  //     www.4sitestudios.com/engaging-networks     //

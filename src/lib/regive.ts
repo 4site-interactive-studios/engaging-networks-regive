@@ -8,6 +8,7 @@ export class Regive {
   private options: RegiveOptions | undefined;
   private readonly isEmbedded: boolean = window !== window.parent;
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
+  private iFrameId: string | null = null;
 
   constructor() {
     const regiveScript = document.querySelector("script[src*='regive']");
@@ -77,6 +78,7 @@ export class Regive {
         this.ENgrid.setBodyData("embedded", "true");
         this.hideAll();
         this.addCustomBanner();
+        this.sendMessageToParent("loaded");
       } else {
         this.log("Conditions not met to modify the embedded page", "⚠️");
       }
@@ -104,6 +106,7 @@ export class Regive {
         this.showCustomThankYouMessage();
         this.clearVgsTokens();
         this.hideAll(true);
+        this.sendMessageToParent("finished");
       } else {
         this.log("Form was not submitted via Regive", "⚠️");
       }
@@ -113,6 +116,7 @@ export class Regive {
         "🟢"
       );
       this.replaceRegiveTagWithIframe();
+      this.listenForMessagesFromChild();
     }
   }
 
@@ -152,16 +156,16 @@ export class Regive {
     });
   }
 
-  private celebrate() {
-    this.log("Celebrating the donation", "🎉");
-    const confetti = this.options?.confetti
-      ? this.options.confetti === true
-        ? ["#FF0000", "#00FF00", "#0000FF"]
-        : this.options.confetti.split(",")
-      : [];
-    this.log("Confetti colors", "🎨", { confetti });
-    // TODO: Implement confetti celebration
-  }
+  // private celebrate() {
+  //   this.log("Celebrating the donation", "🎉");
+  //   const confetti = this.options?.confetti
+  //     ? this.options.confetti === true
+  //       ? ["#FF0000", "#00FF00", "#0000FF"]
+  //       : this.options.confetti.split(",")
+  //     : [];
+  //   this.log("Confetti colors", "🎨", { confetti });
+  //   // TODO: Implement confetti celebration
+  // }
 
   private addCustomBanner() {
     this.log("Adding a custom banner to the page");
@@ -210,6 +214,23 @@ export class Regive {
     const banner = document.createElement("div");
     banner.innerHTML = template;
     document.body.appendChild(banner);
+    // Create a resize observer to send the height to the parent every time the banner is resized
+    const observer = new ResizeObserver(() => {
+      this.sendHeightToParent();
+    });
+    observer.observe(banner);
+    // Add event listeners to the buttons
+    const buttons = banner.querySelectorAll(".regive-amount-btn");
+    buttons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        const amount = (event.currentTarget as HTMLButtonElement).dataset
+          .amount as string;
+        this.log("Amount button clicked", "💰", { amount });
+        this.submitForm(amount);
+      });
+    });
+    // Send banner height to parent
+    this.sendHeightToParent();
   }
 
   private wasSubmittedViaRegive(): boolean {
@@ -239,6 +260,10 @@ export class Regive {
       this.log("Replacing <regive> tag with an iframe");
 
       // Get options from the regive tag
+      const thankYouMessage = regiveTag.getAttribute("thank-you-message") || "";
+      const confetti = regiveTag.getAttribute("confetti") || "false";
+      const bgColor = regiveTag.getAttribute("bg-color") || "#FFF";
+      const txtColor = regiveTag.getAttribute("txt-color") || "#333";
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -258,12 +283,18 @@ export class Regive {
 
       this.log("Setting iframe source", "🔗", { src: iframe.src });
 
+      // Generate iframe ID
+      this.iFrameId = `regive-iframe-${Math.random()
+        .toString(36)
+        .substring(2, 9)}`;
+      iframe.id = this.iFrameId;
+
       // Set appropriate iframe attributes
-      iframe.style.width = "100%";
-      iframe.style.height = "500px"; // Default height, can be customized with an attribute
+      iframe.style.width = "1px";
+      iframe.style.height = "1px";
       iframe.style.border = "none";
       iframe.setAttribute("scrolling", "no");
-      iframe.setAttribute("width", "100%");
+      iframe.setAttribute("width", "1px");
       iframe.setAttribute("scrolling", "no");
       iframe.setAttribute("class", "regive-iframe");
       iframe.setAttribute("frameborder", "0");
@@ -276,8 +307,17 @@ export class Regive {
         iframe.style.height = regiveTag.getAttribute("height") + "px";
       }
 
+      // Create the regive container
+      const regiveContainer = document.createElement("div");
+      regiveContainer.setAttribute("class", "regive-container");
+      regiveContainer.dataset.thankYouMessage = thankYouMessage;
+      regiveContainer.dataset.confetti = confetti;
+      regiveContainer.style.setProperty("--regive-bg-color", bgColor);
+      regiveContainer.style.setProperty("--regive-txt-color", txtColor);
+      regiveContainer.appendChild(iframe);
+
       // Replace the regive tag with our iframe
-      regiveTag.replaceWith(iframe);
+      regiveTag.replaceWith(regiveContainer);
     });
   }
 
@@ -360,9 +400,9 @@ export class Regive {
     const type = window !== window.parent ? "Child" : "Parent";
     const formattedMessage = `%c${emoji} [Regive ${type}] ${message}`;
     if (data) {
-      console.log(formattedMessage, style, data);
+      return console.log(formattedMessage, style, data);
     } else {
-      console.log(formattedMessage, style);
+      return console.log(formattedMessage, style);
     }
   }
   // Extract options from the <regive> tag
@@ -436,5 +476,123 @@ export class Regive {
     }
 
     this.log("Loaded options from URL", "ℹ️", this.options);
+  }
+
+  // Send an action to the parent window
+  private sendMessageToParent(action: string, value: any = null) {
+    if (this.isEmbedded) {
+      this.log("Sending message to parent window", "📤", { action, value });
+      window.parent.postMessage(
+        {
+          sender: "regive",
+          action: action,
+          value: value,
+        },
+        "*"
+      );
+    } else {
+      this.log(
+        "Not in an embedded context. Cannot send message to parent.",
+        "⚠️"
+      );
+    }
+  }
+  // Listen for messages from the parent window
+  private listenForMessagesFromChild() {
+    this.log("Listening for messages from child iframes", "👂");
+    window.addEventListener("message", (event) => {
+      // Check if the message is from regive
+      if (!event.data || !event.data.sender || event.data.sender !== "regive") {
+        return;
+      }
+      // Find the iframe that sent the message by comparing contentWindow with event.source
+      const iframeSource = event.source as Window;
+      let iframe: HTMLIFrameElement | null = null;
+
+      // Look through all regive iframes to find the one that sent this message
+      const iframes = document.querySelectorAll(
+        "iframe.regive-iframe"
+      ) as NodeListOf<HTMLIFrameElement>;
+      iframes.forEach((frame: HTMLIFrameElement) => {
+        if (iframe) return; // Skip if iframe already found
+        try {
+          if (frame.contentWindow === iframeSource) {
+            iframe = frame as HTMLIFrameElement;
+          }
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "SecurityError") {
+            this.log("SecurityError accessing contentWindow of iframe", "⚠️", {
+              frame,
+            });
+          } else {
+            throw error;
+          }
+        }
+      });
+
+      if (!iframe) {
+        this.log("Could not identify which iframe sent the message", "⚠️");
+        return;
+      }
+
+      const iframeContainer = (iframe as HTMLIFrameElement)
+        .parentElement as HTMLDivElement;
+
+      const data = event.data;
+      this.log("Received message from child iframe", "📩", data);
+      switch (data.action) {
+        case "loaded":
+          if (iframeContainer) {
+            iframeContainer.classList.add("regive-loaded");
+            iframeContainer.classList.remove("regive-loading");
+          }
+          break;
+        case "loading":
+          if (iframeContainer) {
+            iframeContainer.classList.add("regive-loading");
+            iframeContainer.classList.remove("regive-loaded");
+          }
+          break;
+        case "finished":
+          this.clearVgsTokens();
+          break;
+        case "height":
+          if (data.value) {
+            if (iframeContainer) {
+              iframeContainer.style.height = data.value + "px";
+              (iframe as HTMLIFrameElement).style.height = data.value + "px";
+              (iframe as HTMLIFrameElement).style.width = "100%";
+              this.log("Iframe height set to", "📏", data.value);
+            }
+          }
+          break;
+        default:
+          this.log("Unknown action received from child iframe", "🔴", data);
+          break;
+      }
+    });
+  }
+  // Send the height of the iframe to the parent window
+  private sendHeightToParent() {
+    if (this.isEmbedded) {
+      const height = document
+        .querySelector(".regive-banner")
+        ?.getBoundingClientRect().height;
+      if (!height) {
+        this.log("Could not get height of the regive container", "⚠️");
+        return;
+      }
+      this.sendMessageToParent("height", height);
+    } else {
+      this.log("Not in an embedded iFrame. This is a Dev Mistake.", "🔴");
+    }
+  }
+  private submitForm(amount: string) {
+    this.log("Submitting form with amount", "💰", { amount });
+    // TODO: Implement the logic to submit the form with the selected amount
+    this.sendMessageToParent("loading");
+    window.setTimeout(() => {
+      this.sendMessageToParent("loaded");
+    }, 5000);
   }
 }
