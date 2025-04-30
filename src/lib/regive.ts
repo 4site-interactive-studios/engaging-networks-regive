@@ -81,6 +81,9 @@ export class Regive {
         this.sendMessageToParent("loaded");
       } else {
         this.log("Conditions not met to modify the embedded page", "⚠️");
+        this.hideAll();
+        this.sendHeightToParent();
+        this.sendMessageToParent("loaded");
       }
     } else {
       this.log("Page is not embedded. Watching tokens", "🟢");
@@ -557,12 +560,17 @@ export class Regive {
           this.clearVgsTokens();
           break;
         case "height":
-          if (data.value) {
+          if (data.value && data.value > 0) {
             if (iframeContainer) {
               iframeContainer.style.height = data.value + "px";
               (iframe as HTMLIFrameElement).style.height = data.value + "px";
               (iframe as HTMLIFrameElement).style.width = "100%";
               this.log("Iframe height set to", "📏", data.value);
+            }
+          } else {
+            this.log("Hiding iframe container", "🙈");
+            if (iframeContainer) {
+              iframeContainer.style.display = "none";
             }
           }
           break;
@@ -579,7 +587,8 @@ export class Regive {
         .querySelector(".regive-banner")
         ?.getBoundingClientRect().height;
       if (!height) {
-        this.log("Could not get height of the regive container", "⚠️");
+        this.log("Sending height of 0 to parent", "🙈");
+        this.sendMessageToParent("height", 0);
         return;
       }
       this.sendMessageToParent("height", height);
