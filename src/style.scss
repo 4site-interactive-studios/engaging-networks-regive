@@ -37,12 +37,12 @@ body[data-regive-embedded="true"] {
   .regive-amount-btn {
     padding: 1rem 2rem;
     margin: 0;
-    border: none;
     border-radius: 5px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
     white-space: nowrap;
     width: calc(50% - 20px);
+    text-align: center;
   }
   .regive-amount-btn:disabled {
     background-color: #ccc;

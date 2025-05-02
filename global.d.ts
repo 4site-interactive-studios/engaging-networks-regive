@@ -20,6 +20,19 @@ declare global {
       clientId?: number;
       pageType?: string;
     };
+    confetti: (options: {
+      startVelocity?: number;
+      spread?: number;
+      ticks?: number;
+      zIndex?: number;
+      useWorker?: boolean;
+      colors?: string[];
+      particleCount?: number;
+      origin?: {
+        x: number;
+        y: number;
+      };
+    }) => void;
   }
 }
 

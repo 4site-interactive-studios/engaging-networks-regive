@@ -1,5 +1,6 @@
 import { ENGrid } from "./engrid";
 import { RegiveOptions } from "./regive-options";
+import "./confetti";
 
 export class Regive {
   private readonly ENgrid = ENGrid;
@@ -159,16 +160,68 @@ export class Regive {
     });
   }
 
-  // private celebrate() {
-  //   this.log("Celebrating the donation", "🎉");
-  //   const confetti = this.options?.confetti
-  //     ? this.options.confetti === true
-  //       ? ["#FF0000", "#00FF00", "#0000FF"]
-  //       : this.options.confetti.split(",")
-  //     : [];
-  //   this.log("Confetti colors", "🎨", { confetti });
-  //   // TODO: Implement confetti celebration
-  // }
+  private celebrate(colors: string, originY: number = 0.5) {
+    if (colors === "false") {
+      this.log("Confetti disabled", "🔴");
+      return;
+    }
+    this.log("Celebrating the donation", "🎉", {
+      colors,
+      originY,
+    });
+
+    const confettiOption = colors.split(",").map((color) => color.trim());
+
+    const duration = 4 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = {
+      startVelocity: 30,
+      ticks: 100,
+      zIndex: 100000,
+      useWorker: false,
+      colors: confettiOption,
+    };
+
+    const randomInRange = (min: number, max: number) => {
+      return Math.random() * (max - min) + min;
+    };
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+      if (confettiOption.length > 0) {
+        const particleCount = 60 * (timeLeft / duration);
+        window.confetti(
+          Object.assign({}, defaults, {
+            particleCount,
+            spread: randomInRange(50, 70),
+            angle: randomInRange(55, 125),
+            origin: { x: randomInRange(0.2, 0.8), y: originY },
+          })
+        );
+        window.confetti(
+          Object.assign({}, defaults, {
+            particleCount,
+            spread: randomInRange(50, 70),
+            angle: randomInRange(55, 125),
+            origin: { x: randomInRange(0.2, 0.8), y: originY },
+          })
+        );
+      }
+    }, 250);
+  }
+
+  // Get the Y position of an element in the viewport
+  private getElementYPosition(element: HTMLElement): number {
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const elementCenter = rect.top + rect.height / 2;
+    const normalizedPosition = elementCenter / viewportHeight;
+    return parseFloat(Math.max(0, Math.min(1, normalizedPosition)).toFixed(2));
+  }
 
   private addCustomBanner() {
     this.log("Adding a custom banner to the page");
@@ -194,12 +247,16 @@ export class Regive {
       .regive-amount-btn {
         background-color: ${buttonBgColor};
         color: ${buttonTxtColor};
+        border: 1px solid ${buttonBgColor};
       }
       .regive-amount-btn:hover {
-        background-color: ${buttonBgColor}CC;
+        background-color: ${buttonTxtColor};
+        color: ${buttonBgColor};
+        border-color: ${buttonBgColor};
       }
       .regive-amount-btn:active {
         background-color: ${buttonBgColor}AA;
+        color: ${buttonTxtColor}AA;
       }
     </style>
     <div class="regive-banner" data-theme="${theme}">
@@ -541,20 +598,27 @@ export class Regive {
       const iframeContainer = (iframe as HTMLIFrameElement)
         .parentElement as HTMLDivElement;
 
+      if (!iframeContainer) {
+        this.log("Could not find the iframe container", "⚠️");
+        return;
+      }
+
       const data = event.data;
       this.log("Received message from child iframe", "📩", data);
       switch (data.action) {
         case "loaded":
-          if (iframeContainer) {
-            iframeContainer.classList.add("regive-loaded");
-            iframeContainer.classList.remove("regive-loading");
-          }
+          iframeContainer.classList.add("regive-loaded");
+          iframeContainer.classList.remove("regive-loading");
           break;
         case "loading":
-          if (iframeContainer) {
-            iframeContainer.classList.add("regive-loading");
-            iframeContainer.classList.remove("regive-loaded");
-          }
+          iframeContainer.classList.add("regive-loading");
+          iframeContainer.classList.remove("regive-loaded");
+          break;
+        case "celebrate":
+          this.celebrate(
+            iframeContainer.dataset.confetti || "",
+            this.getElementYPosition(iframeContainer)
+          );
           break;
         case "finished":
           this.clearVgsTokens();
@@ -602,6 +666,7 @@ export class Regive {
     this.sendMessageToParent("loading");
     window.setTimeout(() => {
       this.sendMessageToParent("loaded");
-    }, 5000);
+      this.sendMessageToParent("celebrate");
+    }, 3000);
   }
 }
