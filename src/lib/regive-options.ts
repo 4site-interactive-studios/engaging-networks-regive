@@ -32,6 +32,9 @@ export interface RegiveOptions {
   /** Layout theme */
   theme?: "button-right" | "button-left" | "button-top" | "stacked";
 
+  /** Source of the donation */
+  source?: string;
+
   /** Enable test mode without actual form submission */
   test?: boolean;
 }

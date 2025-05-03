@@ -1,6 +1,7 @@
 declare global {
   interface Window {
     EngagingNetworks?: {
+      feeCover?: any;
       require?: {
         _defined?: {
           enDependencies?: {

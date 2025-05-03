@@ -264,6 +264,37 @@ export abstract class ENGrid {
     }
     return s.join(dec);
   }
+  // Set a new amount
+  static setAmount(amount: number) {
+    // Run only if it is a Donation Page with a Donation Amount field
+    if (!document.getElementsByName("transaction.donationAmt").length) {
+      return;
+    }
+    // Search for the current amount on radio boxes
+    let found = Array.from(
+      document.querySelectorAll('input[name="transaction.donationAmt"]')
+    ).filter(
+      (el) => el instanceof HTMLInputElement && parseInt(el.value) == amount
+    );
+    // We found the amount on the radio boxes, so check it
+    if (found.length) {
+      const amountField = found[0] as HTMLInputElement;
+      amountField.checked = true;
+    } else {
+      const otherField = document.querySelector(
+        'input[name="transaction.donationAmt.other"]'
+      ) as HTMLInputElement;
+      if (otherField) {
+        const enFieldOtherAmountRadio = document.querySelector(
+          `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
+        ) as HTMLInputElement;
+        if (enFieldOtherAmountRadio) {
+          enFieldOtherAmountRadio.checked = true;
+        }
+        otherField.value = parseFloat(amount.toString()).toFixed(2);
+      }
+    }
+  }
   // Clean an Amount
   static cleanAmount(amount: string): number {
     // Split the number

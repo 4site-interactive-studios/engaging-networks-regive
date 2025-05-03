@@ -79,6 +79,7 @@ export class Regive {
         this.ENgrid.setBodyData("embedded", "true");
         this.hideAll();
         this.addCustomBanner();
+        this.writeHiddenFields();
         this.sendMessageToParent("loaded");
       } else {
         this.log("Conditions not met to modify the embedded page", "⚠️");
@@ -102,21 +103,20 @@ export class Regive {
       this.log("Page is embedded", "ℹ️");
       this.loadOptionsFromUrl();
       if (this.wasSubmittedViaRegive()) {
-        this.log(
-          "Form was submitted via Regive. Performing thank-you actions.",
-          "🟢"
-        );
-        this.sendConfettiSignal();
-        this.showCustomThankYouMessage();
-        this.clearVgsTokens();
-        this.hideAll(true);
-        this.sendMessageToParent("finished");
+        const regiveHeight = localStorage.getItem("regive-height") || "150";
+        // Set the height of the body to the height of the regive banner
+        this.hideAll();
+        document.body.style.height = regiveHeight + "px";
+        this.sendMessageToParent("height", regiveHeight);
+        this.sendMessageToParent("loaded");
+        this.sendMessageToParent("celebrate");
+        this.sendMessageToParent("success");
       } else {
         this.log("Form was not submitted via Regive", "⚠️");
       }
     } else {
       this.log(
-        "Page is not embedded. Replacing <regive> tag with an iframe",
+        "Page is not embedded. Replacing <regive> tag with an <iframe>",
         "🟢"
       );
       this.replaceRegiveTagWithIframe();
@@ -124,24 +124,7 @@ export class Regive {
     }
   }
 
-  private hasVgsTokens(): boolean {
-    const hasTokens = !!(
-      localStorage.getItem("regive-num") &&
-      localStorage.getItem("regive-ver") &&
-      localStorage.getItem("regive-exp")
-    );
-    this.log("Checking if VGS tokens exist in localStorage", "ℹ️", {
-      hasTokens,
-    });
-    return hasTokens;
-  }
-
-  private hideAll(onlyBody: boolean = false) {
-    if (onlyBody) {
-      this.log("Hiding body element", "🔴");
-      document.body.style.display = "none";
-      return;
-    }
+  private hideAll() {
     this.log("Hiding all elements on the page", "🔴");
     // Hide all elements on body
     const elements = document.querySelectorAll("body > *");
@@ -224,7 +207,11 @@ export class Regive {
   }
 
   private addCustomBanner() {
-    this.log("Adding a custom banner to the page");
+    if (this.options?.test) {
+      this.log("Adding a custom banner to the page IN TEST MODE", "⚠️");
+    } else {
+      this.log("Adding a custom banner to the page", "🟢");
+    }
 
     const amounts = this.options?.amount?.split(",") || ["5"];
     const bgColor = this.options?.bgColor || "#FFF";
@@ -234,6 +221,7 @@ export class Regive {
     const heading = this.options?.heading || null;
     const theme = this.options?.theme || "stacked";
     const currencySymbol = this.ENgrid.getCurrencySymbol();
+    const isTest = this.options?.test || false;
 
     const template = `
     <style>
@@ -272,6 +260,9 @@ export class Regive {
     `;
 
     const banner = document.createElement("div");
+    if (isTest) {
+      banner.classList.add("regive-test");
+    }
     banner.innerHTML = template;
     document.body.appendChild(banner);
     // Create a resize observer to send the height to the parent every time the banner is resized
@@ -291,20 +282,109 @@ export class Regive {
     });
     // Send banner height to parent
     this.sendHeightToParent();
+    this.sendMessageToParent("enabled");
+  }
+
+  private writeHiddenFields() {
+    const source = this.options?.source || "REGIVE";
+    const tokens = this.getVgsTokens();
+    const sourceField = this.ENgrid.getField(
+      "supporter.appealCode"
+    ) as HTMLInputElement;
+    if (sourceField) {
+      sourceField.value = source;
+    }
+
+    const expField = this.ENgrid.getField(
+      "transaction.ccexpire"
+    ) as HTMLInputElement;
+
+    if (expField) {
+      if (expField instanceof HTMLInputElement) {
+        expField.value = tokens.exp || "";
+      } else {
+        const expFieldValues = tokens.exp?.includes(",")
+          ? tokens.exp.split(",")
+          : tokens.exp?.split("/");
+        if (expFieldValues && expFieldValues.length > 1) {
+          const expFieldSelects = document.querySelectorAll(
+            "select[name='transaction.ccexpire']"
+          ) as NodeListOf<HTMLSelectElement>;
+          expFieldSelects.forEach((select, index) => {
+            if (index < expFieldValues.length) {
+              select.value = expFieldValues[index].trim();
+            }
+          });
+        }
+      }
+    }
+    const numField = this.ENgrid.getField(
+      "transaction.ccnumber"
+    ) as HTMLInputElement;
+    if (numField) {
+      numField.value = tokens.num || "";
+    }
+    const verField = this.ENgrid.getField(
+      "transaction.ccvv"
+    ) as HTMLInputElement;
+    if (verField) {
+      verField.value = tokens.ver || "";
+    }
+    this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
+    this.ENgrid.setFieldValue("transaction.recurrpay", "");
+
+    this.log("Writing hidden fields to the form", "💾", {
+      source,
+      tokens,
+    });
   }
 
   private wasSubmittedViaRegive(): boolean {
-    // TODO: Implement the logic to check if the form was submitted via Regive
+    const submittedPage = localStorage.getItem("regive-submitted");
+    const currentPage = this.ENgrid.getPageID();
+    this.log("Checking if the form was submitted via Regive", "ℹ️", {
+      submittedPage,
+      currentPage,
+    });
+    if (submittedPage && submittedPage === currentPage.toString()) {
+      this.log("Form was submitted via Regive", "🟢");
+      localStorage.removeItem("regive-submitted");
+      return true;
+    }
+    this.log("Form was not submitted via Regive", "🔴");
     return false;
   }
 
-  private sendConfettiSignal() {
-    this.log("Sending confetti signal to parent window", "🎉");
-    window.parent.postMessage({ action: "showConfetti" }, "*");
+  private hasVgsTokens(): boolean {
+    if (this.options?.test) {
+      this.log("Test mode enabled. Skipping VGS token check", "⚠️");
+      return true;
+    }
+    const hasTokens = !!(
+      localStorage.getItem("regive-num") &&
+      localStorage.getItem("regive-ver") &&
+      localStorage.getItem("regive-exp")
+    );
+    this.log("Checking if VGS tokens exist in localStorage", "ℹ️", {
+      hasTokens,
+    });
+    return hasTokens;
   }
 
-  private showCustomThankYouMessage() {
-    // TODO: Implement the logic to show a custom thank-you message
+  private getVgsTokens(): {
+    num: string | null;
+    ver: string | null;
+    exp: string | null;
+  } {
+    const num = localStorage.getItem("regive-num");
+    const ver = localStorage.getItem("regive-ver");
+    const exp = localStorage.getItem("regive-exp");
+    this.log("Retrieving VGS tokens from localStorage", "💾", {
+      num,
+      ver,
+      exp,
+    });
+    return { num, ver, exp };
   }
 
   private clearVgsTokens() {
@@ -312,6 +392,8 @@ export class Regive {
     localStorage.removeItem("regive-num");
     localStorage.removeItem("regive-ver");
     localStorage.removeItem("regive-exp");
+    localStorage.removeItem("regive-submitted");
+    localStorage.removeItem("regive-height");
   }
 
   private replaceRegiveTagWithIframe() {
@@ -320,10 +402,14 @@ export class Regive {
       this.log("Replacing <regive> tag with an iframe");
 
       // Get options from the regive tag
-      const thankYouMessage = regiveTag.getAttribute("thank-you-message") || "";
-      const confetti = regiveTag.getAttribute("confetti") || "false";
+      const thankYouMessage =
+        regiveTag.getAttribute("thank-you-message") || "Thank You!";
+      const confetti =
+        regiveTag.getAttribute("confetti") ||
+        "#ffffff,#252525,#ffff00,#fcff42,#353535";
       const bgColor = regiveTag.getAttribute("bg-color") || "#FFF";
       const txtColor = regiveTag.getAttribute("txt-color") || "#333";
+      const test = regiveTag.getAttribute("test") || "false";
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -337,7 +423,7 @@ export class Regive {
       const baseUrlWithPage = `${baseUrlWithoutPage}/1`;
 
       const separator = baseUrl.includes("?") ? "&" : "?";
-      iframe.src = `${baseUrlWithPage}${separator}chain&regive-iframe=true${
+      iframe.src = `${baseUrlWithPage}${separator}chain${
         optionsStr ? "&" + optionsStr : ""
       }`;
 
@@ -372,9 +458,20 @@ export class Regive {
       regiveContainer.setAttribute("class", "regive-container");
       regiveContainer.dataset.thankYouMessage = thankYouMessage;
       regiveContainer.dataset.confetti = confetti;
+      if (test === "true") {
+        regiveContainer.dataset.test = "true";
+      }
       regiveContainer.style.setProperty("--regive-bg-color", bgColor);
       regiveContainer.style.setProperty("--regive-txt-color", txtColor);
       regiveContainer.appendChild(iframe);
+
+      // Add Thank You message
+      if (thankYouMessage) {
+        const thankYouMessageElement = document.createElement("div");
+        thankYouMessageElement.setAttribute("class", "regive-thank-you");
+        thankYouMessageElement.innerHTML = `<h2>${thankYouMessage}</h2>`;
+        regiveContainer.appendChild(thankYouMessageElement);
+      }
 
       // Replace the regive tag with our iframe
       regiveTag.replaceWith(regiveContainer);
@@ -606,6 +703,9 @@ export class Regive {
       const data = event.data;
       this.log("Received message from child iframe", "📩", data);
       switch (data.action) {
+        case "enabled":
+          this.ENgrid.setBodyData("enabled", "true");
+          break;
         case "loaded":
           iframeContainer.classList.add("regive-loaded");
           iframeContainer.classList.remove("regive-loading");
@@ -620,8 +720,24 @@ export class Regive {
             this.getElementYPosition(iframeContainer)
           );
           break;
-        case "finished":
-          this.clearVgsTokens();
+        case "success":
+          const iframeContainerParent =
+            iframeContainer.closest(".en__component");
+          if (iframeContainerParent) {
+            iframeContainerParent.classList.add("regive-success");
+          }
+          iframeContainer.classList.add("regive-success");
+          if (iframeContainer.dataset.test !== "true") {
+            this.clearVgsTokens();
+          }
+          break;
+        case "reset":
+          const iframeContainerParentReset =
+            iframeContainer.closest(".en__component");
+          if (iframeContainerParentReset) {
+            iframeContainerParentReset.classList.remove("regive-success");
+          }
+          iframeContainer.classList.remove("regive-success");
           break;
         case "height":
           if (data.value && data.value > 0) {
@@ -633,9 +749,7 @@ export class Regive {
             }
           } else {
             this.log("Hiding iframe container", "🙈");
-            if (iframeContainer) {
-              iframeContainer.style.display = "none";
-            }
+            iframeContainer.style.display = "none";
           }
           break;
         default:
@@ -662,11 +776,58 @@ export class Regive {
   }
   private submitForm(amount: string) {
     this.log("Submitting form with amount", "💰", { amount });
-    // TODO: Implement the logic to submit the form with the selected amount
     this.sendMessageToParent("loading");
-    window.setTimeout(() => {
-      this.sendMessageToParent("loaded");
-      this.sendMessageToParent("celebrate");
-    }, 3000);
+    if (this.options?.test) {
+      this.log("Test mode enabled. Not submitting the form.", "⚠️");
+      window.setTimeout(() => {
+        this.sendMessageToParent("loaded");
+        this.sendMessageToParent("celebrate");
+        this.sendMessageToParent("success");
+      }, 3000);
+      window.setTimeout(() => {
+        // Reset the UX
+        this.sendMessageToParent("reset");
+      }, 8000);
+      return;
+    }
+    const form = this.ENgrid.enForm;
+    if (form) {
+      // EN has a bug where the embedded form will FORCE the use of the feeCover if the parent donation form was set to cover fees
+      // No matter what the user selects on the regive form
+      // So we need to set the amount to a lower amount to consider the fees in case the user selected to cover fees
+      const feeCover = this.ENgrid.getField(
+        "transaction.feeCover"
+      ) as HTMLInputElement;
+      if (feeCover && feeCover.checked) {
+        // I'll need a shower after this
+        const feeCoverAmount =
+          window.EngagingNetworks?.feeCover?.feeCover?.additionalAmount || 0;
+        const feeCoverPercent =
+          window.EngagingNetworks?.feeCover?.feeCover?.percent || 0;
+        const feeCoverType =
+          window.EngagingNetworks?.feeCover?.feeCover?.type || "PERCENT";
+        if (feeCoverType === "PERCENT") {
+          amount = (parseFloat(amount) / (1 + feeCoverPercent / 100)).toFixed(
+            2
+          );
+        } else if (feeCoverType === "AMOUNT") {
+          amount = (parseFloat(amount) - feeCoverAmount).toFixed(2);
+        }
+      }
+      this.ENgrid.setAmount(parseFloat(amount));
+      localStorage.setItem(
+        "regive-submitted",
+        this.ENgrid.getPageID().toString()
+      );
+      const regiveHeight = document
+        .querySelector(".regive-banner")
+        ?.getBoundingClientRect().height;
+      if (regiveHeight) {
+        localStorage.setItem("regive-height", regiveHeight.toString());
+      }
+      form.submit();
+    } else {
+      this.log("Form not found. Cannot submit.", "🔴");
+    }
   }
 }
