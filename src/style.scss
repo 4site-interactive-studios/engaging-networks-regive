@@ -9,6 +9,22 @@ body[data-regive-embedded="true"] {
   iframe {
     display: none;
   }
+  .regive-test {
+    &::after {
+      content: "Test Mode";
+      position: absolute;
+      top: 0;
+      right: 25px;
+      background-color: rgba(255, 0, 0, 0.5);
+      color: white;
+      padding: 5px;
+      font-size: 12px;
+      font-family: monospace;
+      font-weight: bold;
+      transform: rotate(-90deg);
+      transform-origin: top right;
+    }
+  }
   .regive-banner {
     display: flex;
     flex-direction: column;
@@ -63,6 +79,7 @@ body[data-regive-embedded="true"] {
   position: relative;
   overflow: hidden;
   transition: height 0.3s ease-in-out;
+  margin: 1rem auto;
   // Adds a loading spinner
   &::after {
     content: "";
@@ -96,6 +113,44 @@ body[data-regive-embedded="true"] {
     pointer-events: none;
     cursor: default;
   }
+  .regive-thank-you {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--regive-bg-color, #fff);
+    z-index: 1000;
+    transition: transform 0.3s;
+    transform: translateY(100%);
+    gap: 1rem;
+    padding: 1rem;
+    margin: 0 auto;
+    h2 {
+      color: var(--regive-txt-color, #333);
+      font-size: 1.5rem;
+      text-align: center;
+      margin: 0;
+    }
+  }
+  &.regive-success {
+    .regive-thank-you {
+      transform: translateY(0);
+    }
+    &::after {
+      opacity: 0;
+    }
+    &::before {
+      opacity: 0;
+    }
+    iframe {
+      display: none;
+    }
+  }
   @keyframes spin {
     0% {
       transform: rotate(0deg);
@@ -117,4 +172,11 @@ body[data-regive-embedded="true"] {
       display: none;
     }
   }
+}
+
+body:not([data-regive-enabled="true"]) .showif-regive-enabled {
+  display: none;
+}
+body:not(:has(.regive-success)) .showif-regive-success {
+  display: none;
 }
