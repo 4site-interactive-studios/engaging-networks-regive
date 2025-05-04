@@ -71,6 +71,23 @@ export class Regive {
     if (this.isEmbedded) {
       this.log("Page is embedded", "ℹ️");
       this.loadOptionsFromUrl();
+      const submissionFailed = !!(
+        this.ENgrid.checkNested(
+          window.EngagingNetworks,
+          "require",
+          "_defined",
+          "enjs",
+          "checkSubmissionFailed"
+        ) &&
+        window.EngagingNetworks?.require._defined.enjs.checkSubmissionFailed()
+      );
+      if (submissionFailed) {
+        this.log("Server-side submission failed. Exiting", "🔴");
+        this.hideAll();
+        this.sendHeightToParent();
+        this.sendMessageToParent("loaded");
+        return;
+      }
       if (this.hasVgsTokens() && this.isChained) {
         this.log(
           "Conditions met to hide the donation form and add a banner",
@@ -267,7 +284,10 @@ export class Regive {
     document.body.appendChild(banner);
     // Create a resize observer to send the height to the parent every time the banner is resized
     const observer = new ResizeObserver(() => {
-      this.sendHeightToParent();
+      const bannerHeight = banner.getBoundingClientRect().height;
+      if (bannerHeight > 0) {
+        this.sendHeightToParent();
+      }
     });
     observer.observe(banner);
     // Add event listeners to the buttons
