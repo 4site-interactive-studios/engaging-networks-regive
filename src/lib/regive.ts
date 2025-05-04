@@ -170,17 +170,28 @@ export class Regive {
       originY,
     });
 
-    const confettiOption = colors.split(",").map((color) => color.trim());
+    const confettiColors =
+      colors === "default"
+        ? []
+        : colors.split(",").map((color) => color.trim());
 
     const duration = 4 * 1000;
     const animationEnd = Date.now() + duration;
-    const defaults = {
+    const defaults: {
+      startVelocity: number;
+      ticks: number;
+      zIndex: number;
+      useWorker: boolean;
+      colors?: string[];
+    } = {
       startVelocity: 30,
       ticks: 100,
       zIndex: 100000,
       useWorker: false,
-      colors: confettiOption,
     };
+    if (confettiColors.length > 0) {
+      defaults.colors = confettiColors;
+    }
 
     const randomInRange = (min: number, max: number) => {
       return Math.random() * (max - min) + min;
@@ -192,25 +203,23 @@ export class Regive {
       if (timeLeft <= 0) {
         return clearInterval(interval);
       }
-      if (confettiOption.length > 0) {
-        const particleCount = 60 * (timeLeft / duration);
-        window.confetti(
-          Object.assign({}, defaults, {
-            particleCount,
-            spread: randomInRange(50, 70),
-            angle: randomInRange(55, 125),
-            origin: { x: randomInRange(0.2, 0.8), y: originY },
-          })
-        );
-        window.confetti(
-          Object.assign({}, defaults, {
-            particleCount,
-            spread: randomInRange(50, 70),
-            angle: randomInRange(55, 125),
-            origin: { x: randomInRange(0.2, 0.8), y: originY },
-          })
-        );
-      }
+      const particleCount = 60 * (timeLeft / duration);
+      window.confetti(
+        Object.assign({}, defaults, {
+          particleCount,
+          spread: randomInRange(50, 70),
+          angle: randomInRange(55, 125),
+          origin: { x: randomInRange(0.2, 0.8), y: originY },
+        })
+      );
+      window.confetti(
+        Object.assign({}, defaults, {
+          particleCount,
+          spread: randomInRange(50, 70),
+          angle: randomInRange(55, 125),
+          origin: { x: randomInRange(0.2, 0.8), y: originY },
+        })
+      );
     }, 250);
   }
 
@@ -230,14 +239,25 @@ export class Regive {
       this.log("Adding a custom banner to the page", "🟢");
     }
 
+    const currencySymbol = this.ENgrid.getCurrencySymbol();
+
     const amounts = this.options?.amount?.split(",") || ["5"];
+    const labels: string[] = [];
     const bgColor = this.options?.bgColor || "#FFF";
     const txtColor = this.options?.txtColor || "#333";
     const buttonBgColor = this.options?.buttonBgColor || "#007BFF";
     const buttonTxtColor = this.options?.buttonTxtColor || "#FFF";
+    const buttonLabel = this.options?.buttonLabel || "Add {amount}";
+    const buttonLabelRegex = new RegExp("{amount}", "g");
+    amounts.forEach((amount) => {
+      const label = buttonLabel.replace(
+        buttonLabelRegex,
+        `<span class="regive-currency">${currencySymbol}</span><span class="regive-amount">${amount.trim()}</span>`
+      );
+      labels.push(label);
+    });
     const heading = this.options?.heading || null;
     const theme = this.options?.theme || "stacked";
-    const currencySymbol = this.ENgrid.getCurrencySymbol();
     const isTest = this.options?.test || false;
 
     const template = `
@@ -268,8 +288,10 @@ export class Regive {
       ${heading ? `<h1 class="regive-heading">${heading}</h1>` : ""}
       <div class="regive-amounts">
         ${amounts
-          .map((amount) => {
-            return `<button class="regive-amount-btn" data-amount="${amount.trim()}"><span class="regive-currency">${currencySymbol}</span><span class="regive-amount">${amount.trim()}</span></button>`;
+          .map((amount, index) => {
+            return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
+              labels[index]
+            }</button>`;
           })
           .join("")}
       </div>
@@ -278,7 +300,9 @@ export class Regive {
 
     const banner = document.createElement("div");
     if (isTest) {
-      banner.classList.add("regive-test");
+      window.setTimeout(() => {
+        banner.classList.add("regive-test");
+      }, 2000);
     }
     banner.innerHTML = template;
     document.body.appendChild(banner);
@@ -424,9 +448,7 @@ export class Regive {
       // Get options from the regive tag
       const thankYouMessage =
         regiveTag.getAttribute("thank-you-message") || "Thank You!";
-      const confetti =
-        regiveTag.getAttribute("confetti") ||
-        "#ffffff,#252525,#ffff00,#fcff42,#353535";
+      const confetti = regiveTag.getAttribute("confetti") || "default";
       const bgColor = regiveTag.getAttribute("bg-color") || "#FFF";
       const txtColor = regiveTag.getAttribute("txt-color") || "#333";
       const test = regiveTag.getAttribute("test") || "false";

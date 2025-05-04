@@ -155,7 +155,15 @@
       y: 0.5,
       shapes: ["square", "circle"],
       zIndex: 100,
-      colors: ["#ffffff", "#252525", "#ffff00", "#fcff42", "#353535"],
+      colors: [
+        "#26ccff",
+        "#a25afd",
+        "#ff5e7e",
+        "#88ff5a",
+        "#fcff42",
+        "#ffa62d",
+        "#ff36ff",
+      ],
       disableForReducedMotion: false,
       scalar: 1,
     };

@@ -29,6 +29,9 @@ export interface RegiveOptions {
   /** Button text color */
   buttonTxtColor?: string;
 
+  /** Button Label */
+  buttonLabel?: string;
+
   /** Layout theme */
   theme?: "button-right" | "button-left" | "button-top" | "stacked";
 

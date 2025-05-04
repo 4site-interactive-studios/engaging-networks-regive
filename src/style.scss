@@ -13,8 +13,11 @@ body[data-regive-embedded="true"] {
     &::after {
       content: "Test Mode";
       position: absolute;
-      top: 0;
-      right: 25px;
+      width: 100vh;
+      box-sizing: border-box;
+      text-align: center;
+      top: -10px;
+      right: 10px;
       background-color: rgba(255, 0, 0, 0.5);
       color: white;
       padding: 5px;
@@ -22,7 +25,8 @@ body[data-regive-embedded="true"] {
       font-family: monospace;
       font-weight: bold;
       transform: rotate(-90deg);
-      transform-origin: top right;
+      transform-origin: center right;
+      line-height: 1;
     }
   }
   .regive-banner {
