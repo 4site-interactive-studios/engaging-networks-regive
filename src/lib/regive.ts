@@ -247,8 +247,8 @@ export class Regive {
     const txtColor = this.options?.txtColor || "#333";
     const buttonBgColor = this.options?.buttonBgColor || "#007BFF";
     const buttonTxtColor = this.options?.buttonTxtColor || "#FFF";
-    const buttonLabel = this.options?.buttonLabel || "Add {amount}";
-    const buttonLabelRegex = new RegExp("{amount}", "g");
+    const buttonLabel = this.options?.buttonLabel || "Add {{amount}}";
+    const buttonLabelRegex = new RegExp("{{amount}}", "g");
     amounts.forEach((amount) => {
       const label = buttonLabel.replace(
         buttonLabelRegex,
@@ -258,32 +258,96 @@ export class Regive {
     });
     const heading = this.options?.heading || null;
     const theme = this.options?.theme || "stacked";
+    let template;
+    const templateID = this.options?.template || null;
     const isTest = this.options?.test || false;
 
-    const template = `
+    const templateCSS = `
     <style>
+      .regive-embed {
+        --regive-bg-color: ${bgColor};
+        --regive-txt-color: ${txtColor};
+        --regive-button-bg-color: ${buttonBgColor};
+        --regive-button-txt-color: ${buttonTxtColor};
+        --regive-button-label: ${buttonLabel};
+        --regive-button-label-regex: ${buttonLabelRegex};
+        --regive-theme: ${theme};
+      }
       .regive-banner {
-        background-color: ${bgColor};
-        color: ${txtColor};
+        background-color: var(--regive-bg-color);
+        color: var(--regive-txt-color);
       }
       .regive-heading {
-        color: ${txtColor};
+        color: var(--regive-txt-color);
       }
       .regive-amount-btn {
-        background-color: ${buttonBgColor};
-        color: ${buttonTxtColor};
-        border: 1px solid ${buttonBgColor};
+        background-color: var(--regive-button-bg-color);
+        color: var(--regive-button-txt-color);
+        border: 1px solid var(--regive-button-bg-color);
       }
       .regive-amount-btn:hover {
-        background-color: ${buttonTxtColor};
-        color: ${buttonBgColor};
-        border-color: ${buttonBgColor};
-      }
-      .regive-amount-btn:active {
-        background-color: ${buttonBgColor}AA;
-        color: ${buttonTxtColor}AA;
+        background-color: var(--regive-button-txt-color);
+        color: var(--regive-button-bg-color);
+        border-color: var(--regive-button-bg-color);
       }
     </style>
+    `;
+
+    if (templateID) {
+      const templateElement = document.getElementById(templateID);
+      if (templateElement) {
+        this.log("Using custom template from the page", "🟢", templateID);
+        const templateContent = templateElement.innerHTML;
+        // Check if the template has {{button}}
+        if (templateContent.includes("{{button}}")) {
+          template =
+            templateCSS +
+            templateContent.replace(
+              "{{button}}",
+              `
+          <div class="regive-amounts">
+            ${amounts
+              .map((amount, index) => {
+                return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
+                  labels[index]
+                }</button>`;
+              })
+              .join("")}
+          </div>
+          `
+            );
+          template = template.replace(
+            /{{heading}}/g,
+            heading ? `<h1 class="regive-heading">${heading}</h1>` : ""
+          );
+          template = template.replace(/{{theme}}/g, theme ? theme : "");
+          template = template.replace(/{{bg-color}}/g, bgColor ? bgColor : "");
+          template = template.replace(
+            /{{txt-color}}/g,
+            txtColor ? txtColor : ""
+          );
+          template = template.replace(
+            /{{button-bg-color}}/g,
+            buttonBgColor ? buttonBgColor : ""
+          );
+          template = template.replace(
+            /{{button-txt-color}}/g,
+            buttonTxtColor ? buttonTxtColor : ""
+          );
+          templateElement.remove();
+        } else {
+          this.log(
+            "Custom template does not have {{button}} - Using default template",
+            "🔴"
+          );
+          template = null;
+        }
+      }
+    }
+    if (!template) {
+      this.log("Using default template", "🟢");
+      template = `
+    ${templateCSS}
     <div class="regive-banner" data-theme="${theme}">
       ${heading ? `<h1 class="regive-heading">${heading}</h1>` : ""}
       <div class="regive-amounts">
@@ -297,8 +361,10 @@ export class Regive {
       </div>
       </div>
     `;
+    }
 
     const banner = document.createElement("div");
+    banner.setAttribute("class", "regive-embed");
     if (isTest) {
       window.setTimeout(() => {
         banner.classList.add("regive-test");
@@ -690,10 +756,7 @@ export class Regive {
         "*"
       );
     } else {
-      this.log(
-        "Not in an embedded context. Cannot send message to parent.",
-        "⚠️"
-      );
+      this.log("Not in an embedded iFrame. This is a Dev Mistake.", "🔴");
     }
   }
   // Listen for messages from the parent window
@@ -804,8 +867,9 @@ export class Regive {
   private sendHeightToParent() {
     if (this.isEmbedded) {
       const height = document
-        .querySelector(".regive-banner")
-        ?.getBoundingClientRect().height;
+        .querySelector(".regive-embed")
+        ?.getBoundingClientRect()
+        .height.toFixed(0);
       if (!height) {
         this.log("Sending height of 0 to parent", "🙈");
         this.sendMessageToParent("height", 0);
