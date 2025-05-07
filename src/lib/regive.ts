@@ -11,6 +11,13 @@ export class Regive {
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
   private iFrameId: string | null = null;
 
+  private readonly themes = [
+    "button-right",
+    "button-left",
+    "button-top",
+    "stacked",
+  ];
+
   constructor() {
     const regiveScript = document.querySelector("script[src*='regive']");
     // Check if the script is loaded with debug mode
@@ -257,9 +264,8 @@ export class Regive {
       labels.push(label);
     });
     const heading = this.options?.heading || null;
-    const theme = this.options?.theme || "stacked";
+    let theme = this.options?.theme || "stacked";
     let template;
-    const templateID = this.options?.template || null;
     const isTest = this.options?.test || false;
 
     const templateCSS = `
@@ -292,11 +298,11 @@ export class Regive {
       }
     </style>
     `;
-
-    if (templateID) {
-      const templateElement = document.getElementById(templateID);
+    // Check if theme is not part of the predefined themes
+    if (!this.themes.includes(theme)) {
+      const templateElement = document.getElementById(theme);
       if (templateElement) {
-        this.log("Using custom template from the page", "🟢", templateID);
+        this.log("Using custom theme from the page", "🟢", theme);
         const templateContent = templateElement.innerHTML;
         // Check if the template has {{button}}
         if (templateContent.includes("{{button}}")) {
@@ -337,15 +343,18 @@ export class Regive {
           templateElement.remove();
         } else {
           this.log(
-            "Custom template does not have {{button}} - Using default template",
+            "Custom theme does not have {{button}} - Using default theme",
             "🔴"
           );
-          template = null;
+          theme = "stacked";
         }
+      } else {
+        this.log("Custom theme not found - Using default theme", "🔴");
+        theme = "stacked";
       }
     }
     if (!template) {
-      this.log("Using default template", "🟢");
+      this.log(`Using theme ${theme}`, "🟢");
       template = `
     ${templateCSS}
     <div class="regive-banner" data-theme="${theme}">
@@ -926,7 +935,7 @@ export class Regive {
         this.ENgrid.getPageID().toString()
       );
       const regiveHeight = document
-        .querySelector(".regive-banner")
+        .querySelector(".regive-embed")
         ?.getBoundingClientRect().height;
       if (regiveHeight) {
         localStorage.setItem("regive-height", regiveHeight.toString());

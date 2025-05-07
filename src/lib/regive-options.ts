@@ -32,11 +32,8 @@ export interface RegiveOptions {
   /** Button Label (It can have a merge tag {{amount}}) */
   buttonLabel?: string;
 
-  /** Layout theme */
-  theme?: "button-right" | "button-left" | "button-top" | "stacked";
-
-  /** If defined and found on the page, the theme will be ignored */
-  template?: string;
+  /** Layout theme - If not part of the predefined themes, it will be used as a custom theme */
+  theme?: string;
 
   /** Source of the donation */
   source?: string;

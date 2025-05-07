@@ -89,52 +89,6 @@ export abstract class ENGrid {
     return;
   }
 
-  // Create a hidden input field
-  static createHiddenInput(name: string, value: string = "") {
-    const formBlock = document.createElement("div");
-    formBlock.classList.add(
-      "en__component",
-      "en__component--formblock",
-      "hide"
-    );
-
-    const textField = document.createElement("div");
-    textField.classList.add("en__field", "en__field--text");
-
-    const textElement = document.createElement("div");
-    textElement.classList.add("en__field__element", "en__field__element--text");
-
-    const inputField = document.createElement("input");
-    inputField.classList.add(
-      "en__field__input",
-      "en__field__input--text",
-      "engrid-added-input"
-    );
-    inputField.setAttribute("name", name);
-    inputField.setAttribute("type", "hidden");
-    inputField.setAttribute("value", value);
-
-    textElement.appendChild(inputField);
-    textField.appendChild(textElement);
-    formBlock.appendChild(textField);
-    const submitElement = document.querySelector(
-      ".en__submit"
-    ) as HTMLDivElement;
-    if (submitElement) {
-      const lastFormComponent = submitElement.closest(".en__component");
-      if (lastFormComponent) {
-        // Insert the new field after the submit button
-        lastFormComponent.parentNode?.insertBefore(
-          formBlock,
-          lastFormComponent.nextSibling
-        );
-      }
-    } else {
-      ENGrid.enForm.appendChild(formBlock);
-    }
-    return inputField;
-  }
-
   // Return the page count
   static getPageCount() {
     if ("pageJson" in window) return window?.pageJson?.pageCount || 0;
@@ -235,35 +189,6 @@ export abstract class ENGrid {
     return body.hasAttribute(`data-regive-${dataName}`);
   }
 
-  // Format a number
-  static formatNumber(
-    number: string | number,
-    decimals: number = 2,
-    dec_point: string = ".",
-    thousands_sep: string = ","
-  ) {
-    // Strip all characters but numerical ones.
-    number = (number + "").replace(/[^0-9+\-Ee.]/g, "");
-    const n = !isFinite(+number) ? 0 : +number;
-    const prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
-    const sep = typeof thousands_sep === "undefined" ? "," : thousands_sep;
-    const dec = typeof dec_point === "undefined" ? "." : dec_point;
-    let s = [];
-    const toFixedFix = function (n: number, prec: number) {
-      const k = Math.pow(10, prec);
-      return "" + Math.round(n * k) / k;
-    };
-    // Fix for IE parseFloat(0.55).toFixed(0) = 0;
-    s = (prec ? toFixedFix(n, prec) : "" + Math.round(n)).split(".");
-    if (s[0].length > 3) {
-      s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
-    }
-    if ((s[1] || "").length < prec) {
-      s[1] = s[1] || "";
-      s[1] += new Array(prec - s[1].length + 1).join("0");
-    }
-    return s.join(dec);
-  }
   // Set a new amount
   static setAmount(amount: number) {
     // Run only if it is a Donation Page with a Donation Amount field
@@ -294,46 +219,6 @@ export abstract class ENGrid {
         otherField.value = parseFloat(amount.toString()).toFixed(2);
       }
     }
-  }
-  // Clean an Amount
-  static cleanAmount(amount: string): number {
-    // Split the number
-    const valueArray = amount.replace(/[^0-9,\.]/g, "").split(/[,.]+/);
-    const delimArray = amount.replace(/[^.,]/g, "").split("");
-    // Handle values with no decimal places and non-numeric values
-    if (valueArray.length === 1) {
-      return parseInt(valueArray[0]) || 0;
-    }
-    // Ignore invalid numbers
-    if (
-      valueArray
-        .map((x, index) => {
-          return index > 0 && index + 1 !== valueArray.length && x.length !== 3
-            ? true
-            : false;
-        })
-        .includes(true)
-    ) {
-      return 0;
-    }
-    // Multiple commas is a bad thing? So edgy.
-    if (delimArray.length > 1 && !delimArray.includes(".")) {
-      return 0;
-    }
-    // Handle invalid decimal and comma formatting
-    if ([...new Set(delimArray.slice(0, -1))].length > 1) {
-      return 0;
-    }
-    // If there are cents
-    if (valueArray[valueArray.length - 1].length <= 2) {
-      const cents = valueArray.pop() || "00";
-      return parseInt(cents) > 0
-        ? parseFloat(
-            Number(parseInt(valueArray.join("")) + "." + cents).toFixed(2)
-          )
-        : parseInt(valueArray.join(""));
-    }
-    return parseInt(valueArray.join(""));
   }
   /**
    * Check if the provided object has ALL the provided properties

@@ -55,12 +55,12 @@ body[data-regive-embedded="true"] {
     min-width: 300px;
   }
   .regive-amount-btn {
-    padding: 1rem 0;
+    padding: 1rem 0.25rem;
     margin: 0;
     cursor: pointer;
     transition: background-color 0.3s, color 0.3s, border-color 0.3s;
     white-space: nowrap;
-    width: calc(50% - 20px);
+    min-width: calc(50% - 20px);
     text-align: center;
   }
   .regive-amount-btn:disabled {
