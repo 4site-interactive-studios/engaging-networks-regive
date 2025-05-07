@@ -1,418 +1,191 @@
-!(function (window, module) {
-  (function main(global, module, isWorker, workerSize) {
-    function promise(func) {
-      try {
-        return new (module.exports.Promise || global.Promise)(func);
-      } catch (e) {
-        func(
-          () => {},
-          () => {}
-        );
-      }
-    }
-    var raf = (function () {
-      var TIME = Math.floor(1000 / 60);
-      var frame, cancel;
-      var frames = {};
-      var lastFrameTime = 0;
-      if (
-        typeof requestAnimationFrame === "function" &&
-        typeof cancelAnimationFrame === "function"
-      ) {
-        frame = function (cb) {
-          var id = Math.random();
-          frames[id] = requestAnimationFrame(function onFrame(time) {
-            if (lastFrameTime === time || lastFrameTime + TIME - 1 < time) {
-              lastFrameTime = time;
-              delete frames[id];
-              cb();
-            } else {
-              frames[id] = requestAnimationFrame(onFrame);
-            }
-          });
-          return id;
-        };
-        cancel = function (id) {
-          if (frames[id]) {
-            cancelAnimationFrame(frames[id]);
-          }
-        };
-      } else {
-        frame = function (cb) {
-          return setTimeout(cb, TIME);
-        };
-        cancel = function (timer) {
-          return clearTimeout(timer);
-        };
-      }
-      return { frame: frame, cancel: cancel };
-    })();
+class RegiveConfetti {
+  static DEFAULTS = {
+    particleCount: 50,
+    angle: 90,
+    spread: 45,
+    startVelocity: 45,
+    decay: 0.9,
+    gravity: 1,
+    drift: 0,
+    ticks: 200,
+    x: 0.5,
+    y: 0.5,
+    zIndex: 100,
+    colors: [
+      "#26ccff",
+      "#a25afd",
+      "#ff5e7e",
+      "#88ff5a",
+      "#fcff42",
+      "#ffa62d",
+      "#ff36ff",
+    ],
+    scalar: 1,
+  };
 
-    var defaults = {
-      particleCount: 50,
-      angle: 90,
-      spread: 45,
-      startVelocity: 45,
-      decay: 0.9,
-      gravity: 1,
-      drift: 0,
-      ticks: 200,
-      x: 0.5,
-      y: 0.5,
-      shapes: ["square", "circle"],
-      zIndex: 100,
-      colors: [
-        "#26ccff",
-        "#a25afd",
-        "#ff5e7e",
-        "#88ff5a",
-        "#fcff42",
-        "#ffa62d",
-        "#ff36ff",
-      ],
-      disableForReducedMotion: false,
-      scalar: 1,
+  static toDecimal(str) {
+    return parseInt(str, 16);
+  }
+  static hexToRgb(str) {
+    let val = String(str).replace(/[^0-9a-f]/gi, "");
+    if (val.length < 6) {
+      val = val[0] + val[0] + val[1] + val[1] + val[2] + val[2];
+    }
+    return {
+      r: RegiveConfetti.toDecimal(val.substring(0, 2)),
+      g: RegiveConfetti.toDecimal(val.substring(2, 4)),
+      b: RegiveConfetti.toDecimal(val.substring(4, 6)),
     };
-    function convert(val, transform) {
-      return transform ? transform(val) : val;
-    }
-    function isOk(val) {
-      return !(val === null || val === undefined);
-    }
-    function prop(options, name, transform) {
-      return convert(
-        options && isOk(options[name]) ? options[name] : defaults[name],
-        transform
-      );
-    }
-    function onlyPositiveInt(number) {
-      return number < 0 ? 0 : Math.floor(number);
-    }
-    function randomInt(min, max) {
-      return Math.floor(Math.random() * (max - min)) + min;
-    }
-    function toDecimal(str) {
-      return parseInt(str, 16);
-    }
-    function colorsToRgb(colors) {
-      return colors.map(hexToRgb);
-    }
-    function hexToRgb(str) {
-      var val = String(str).replace(/[^0-9a-f]/gi, "");
-      if (val.length < 6) {
-        val = val[0] + val[0] + val[1] + val[1] + val[2] + val[2];
-      }
-      return {
-        r: toDecimal(val.substring(0, 2)),
-        g: toDecimal(val.substring(2, 4)),
-        b: toDecimal(val.substring(4, 6)),
-      };
-    }
-    function getOrigin(options) {
-      var origin = prop(options, "origin", Object);
-      origin.x = prop(origin, "x", Number);
-      origin.y = prop(origin, "y", Number);
-      return origin;
-    }
-    function setCanvasWindowSize(canvas) {
-      canvas.width = document.documentElement.clientWidth;
-      canvas.height = document.documentElement.clientHeight;
-    }
-    function setCanvasRectSize(canvas) {
-      var rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-    }
-    function getCanvas(zIndex) {
-      var canvas = document.createElement("canvas");
-      canvas.style.position = "fixed";
-      canvas.style.top = "0px";
-      canvas.style.left = "0px";
-      canvas.style.pointerEvents = "none";
-      canvas.style.zIndex = zIndex;
-      return canvas;
-    }
-    function ellipse(
-      context,
-      x,
-      y,
-      radiusX,
-      radiusY,
-      rotation,
-      startAngle,
-      endAngle,
-      antiClockwise
-    ) {
-      context.save();
-      context.translate(x, y);
-      context.rotate(rotation);
-      context.scale(radiusX, radiusY);
-      context.arc(0, 0, 1, startAngle, endAngle, antiClockwise);
-      context.restore();
-    }
-    function randomPhysics(opts) {
-      var radAngle = opts.angle * (Math.PI / 180);
-      var radSpread = opts.spread * (Math.PI / 180);
-      return {
-        x: opts.x,
-        y: opts.y,
-        wobble: Math.random() * 10,
-        velocity: opts.startVelocity * 0.5 + Math.random() * opts.startVelocity,
-        angle2D: -radAngle + (0.5 * radSpread - Math.random() * radSpread),
-        tiltAngle: Math.random() * Math.PI,
-        color: opts.color,
-        shape: opts.shape,
-        tick: 0,
-        totalTicks: opts.ticks,
-        decay: opts.decay,
-        drift: opts.drift,
-        random: Math.random() + 5,
-        tiltSin: 0,
-        tiltCos: 0,
-        wobbleX: 0,
-        wobbleY: 0,
-        gravity: opts.gravity * 3,
-        ovalScalar: 0.6,
-        scalar: opts.scalar,
-      };
-    }
-    function updateFetti(context, fetti) {
-      fetti.x += Math.cos(fetti.angle2D) * fetti.velocity + fetti.drift;
-      fetti.y += Math.sin(fetti.angle2D) * fetti.velocity + fetti.gravity;
-      fetti.wobble += 0.1;
-      fetti.velocity *= fetti.decay;
-      fetti.tiltAngle += 0.1;
-      fetti.tiltSin = Math.sin(fetti.tiltAngle);
-      fetti.tiltCos = Math.cos(fetti.tiltAngle);
-      fetti.random = Math.random() + 5;
-      fetti.wobbleX = fetti.x + 10 * fetti.scalar * Math.cos(fetti.wobble);
-      fetti.wobbleY = fetti.y + 10 * fetti.scalar * Math.sin(fetti.wobble);
-      var progress = fetti.tick++ / fetti.totalTicks;
-      var x1 = fetti.x + fetti.random * fetti.tiltCos;
-      var y1 = fetti.y + fetti.random * fetti.tiltSin;
-      var x2 = fetti.wobbleX + fetti.random * fetti.tiltCos;
-      var y2 = fetti.wobbleY + fetti.random * fetti.tiltSin;
-      context.fillStyle =
-        "rgba(" +
-        fetti.color.r +
-        ", " +
-        fetti.color.g +
-        ", " +
-        fetti.color.b +
-        ", " +
-        (1 - progress) +
-        ")";
-      context.beginPath();
-      if (fetti.shape === "circle") {
-        context.ellipse
-          ? context.ellipse(
-              fetti.x,
-              fetti.y,
-              Math.abs(x2 - x1) * fetti.ovalScalar,
-              Math.abs(y2 - y1) * fetti.ovalScalar,
-              (Math.PI / 10) * fetti.wobble,
-              0,
-              2 * Math.PI
-            )
-          : ellipse(
-              context,
-              fetti.x,
-              fetti.y,
-              Math.abs(x2 - x1) * fetti.ovalScalar,
-              Math.abs(y2 - y1) * fetti.ovalScalar,
-              (Math.PI / 10) * fetti.wobble,
-              0,
-              2 * Math.PI
-            );
-      } else {
-        context.moveTo(Math.floor(fetti.x), Math.floor(fetti.y));
-        context.lineTo(Math.floor(fetti.wobbleX), Math.floor(y1));
-        context.lineTo(Math.floor(x2), Math.floor(y2));
-        context.lineTo(Math.floor(x1), Math.floor(fetti.wobbleY));
-      }
-      context.closePath();
-      context.fill();
-      return fetti.tick < fetti.totalTicks;
-    }
-    function animate(canvas, fettis, resizer, size, done) {
-      var animatingFettis = fettis.slice();
-      var context = canvas.getContext("2d");
-      var animationFrame;
-      var destroy;
-      var prom = promise(function (resolve) {
-        function onDone() {
-          animationFrame = destroy = null;
-          context.clearRect(0, 0, size.width, size.height);
-          done();
-          resolve();
-        }
-        function update() {
-          if (
-            isWorker &&
-            !(
-              size.width === workerSize.width &&
-              size.height === workerSize.height
-            )
-          ) {
-            size.width = canvas.width = workerSize.width;
-            size.height = canvas.height = workerSize.height;
-          }
-          if (!size.width && !size.height) {
-            resizer(canvas);
-            size.width = canvas.width;
-            size.height = canvas.height;
-          }
-          context.clearRect(0, 0, size.width, size.height);
-          animatingFettis = animatingFettis.filter(function (fetti) {
-            return updateFetti(context, fetti);
-          });
-          if (animatingFettis.length) {
-            animationFrame = raf.frame(update);
-          } else {
-            onDone();
-          }
-        }
-        animationFrame = raf.frame(update);
-        destroy = onDone;
-      });
-      return {
-        addFettis: function (fettis) {
-          animatingFettis = animatingFettis.concat(fettis);
-          return prom;
-        },
-        canvas: canvas,
-        promise: prom,
-        reset: function () {
-          if (animationFrame) {
-            raf.cancel(animationFrame);
-          }
-          if (destroy) {
-            destroy();
-          }
-        },
-      };
-    }
-    function confettiCannon(canvas, globalOpts) {
-      var isLibCanvas = !canvas;
-      var allowResize = !!prop(globalOpts || {}, "resize");
-      var globalDisableForReducedMotion = prop(
-        globalOpts,
-        "disableForReducedMotion",
-        Boolean
-      );
-      var resizer = isLibCanvas ? setCanvasWindowSize : setCanvasRectSize;
-      var initialized = false;
-      var preferLessMotion =
-        typeof matchMedia === "function" &&
-        matchMedia("(prefers-reduced-motion)").matches;
-      var animationObj;
-      function fireLocal(options, size, done) {
-        var particleCount = prop(options, "particleCount", onlyPositiveInt);
-        var angle = prop(options, "angle", Number);
-        var spread = prop(options, "spread", Number);
-        var startVelocity = prop(options, "startVelocity", Number);
-        var decay = prop(options, "decay", Number);
-        var gravity = prop(options, "gravity", Number);
-        var drift = prop(options, "drift", Number);
-        var colors = prop(options, "colors", colorsToRgb);
-        var ticks = prop(options, "ticks", Number);
-        var shapes = prop(options, "shapes");
-        var scalar = prop(options, "scalar");
-        var origin = getOrigin(options);
-        var temp = particleCount;
-        var fettis = [];
-        var startX = canvas.width * origin.x;
-        var startY = canvas.height * origin.y;
-        while (temp--) {
-          fettis.push(
-            randomPhysics({
-              x: startX,
-              y: startY,
-              angle: angle,
-              spread: spread,
-              startVelocity: startVelocity,
-              color: colors[temp % colors.length],
-              shape: shapes[randomInt(0, shapes.length)],
-              ticks: ticks,
-              decay: decay,
-              gravity: gravity,
-              drift: drift,
-              scalar: scalar,
-            })
-          );
-        }
-        if (animationObj) {
-          return animationObj.addFettis(fettis);
-        }
-        animationObj = animate(canvas, fettis, resizer, size, done);
-        return animationObj.promise;
-      }
-      function fire(options) {
-        var disableForReducedMotion =
-          globalDisableForReducedMotion ||
-          prop(options, "disableForReducedMotion", Boolean);
-        var zIndex = prop(options, "zIndex", Number);
-        if (disableForReducedMotion && preferLessMotion) {
-          return promise(function (resolve) {
-            resolve();
-          });
-        }
-        if (isLibCanvas && animationObj) {
-          canvas = animationObj.canvas;
-        } else if (isLibCanvas && !canvas) {
-          canvas = getCanvas(zIndex);
-          document.body.appendChild(canvas);
-        }
-        if (allowResize && !initialized) {
-          resizer(canvas);
-        }
-        var size = {
-          width: canvas.width,
-          height: canvas.height,
-        };
-        initialized = true;
-        function onResize() {
-          size.width = size.height = null;
-        }
-        function done() {
-          animationObj = null;
-          if (allowResize) {
-            global.removeEventListener("resize", onResize);
-          }
-          if (isLibCanvas && canvas) {
-            document.body.removeChild(canvas);
-            canvas = null;
-            initialized = false;
-          }
-        }
-        if (allowResize) {
-          global.addEventListener("resize", onResize, false);
-        }
-        return fireLocal(options, size, done);
-      }
-      fire.reset = function () {
-        if (animationObj) {
-          animationObj.reset();
-        }
-      };
-      return fire;
-    }
-    module.exports = confettiCannon(null, { resize: true });
-    module.exports.create = confettiCannon;
-  })(
-    (function () {
-      if (typeof window !== "undefined") {
-        return window;
-      }
-      if (typeof self !== "undefined") {
-        return self;
-      }
-      return this || {};
-    })(),
-    module,
-    false
-  );
-  window.confetti = module.exports;
-})(window, {});
+  }
 
-export default window.confetti;
+  static getCanvas(zIndex) {
+    const canvas = document.createElement("canvas");
+    canvas.style.position = "fixed";
+    canvas.style.top = "0px";
+    canvas.style.left = "0px";
+    canvas.style.pointerEvents = "none";
+    canvas.style.zIndex = zIndex;
+    canvas.width = document.documentElement.clientWidth;
+    canvas.height = document.documentElement.clientHeight;
+    return canvas;
+  }
+
+  static randomPhysics(opts) {
+    const radAngle = opts.angle * (Math.PI / 180);
+    const radSpread = opts.spread * (Math.PI / 180);
+    return {
+      x: opts.x,
+      y: opts.y,
+      wobble: Math.random() * 10,
+      velocity: opts.startVelocity * 0.5 + Math.random() * opts.startVelocity,
+      angle2D: -radAngle + (0.5 * radSpread - Math.random() * radSpread),
+      tiltAngle: Math.random() * Math.PI,
+      color: opts.color,
+      tick: 0,
+      totalTicks: opts.ticks,
+      decay: opts.decay,
+      drift: opts.drift,
+      random: Math.random() + 5,
+      tiltSin: 0,
+      tiltCos: 0,
+      wobbleX: 0,
+      wobbleY: 0,
+      gravity: opts.gravity * 3,
+      ovalScalar: 0.6,
+      scalar: opts.scalar,
+    };
+  }
+
+  static updateParticle(ctx, p) {
+    p.x += Math.cos(p.angle2D) * p.velocity + p.drift;
+    p.y += Math.sin(p.angle2D) * p.velocity + p.gravity;
+    p.wobble += 0.1;
+    p.velocity *= p.decay;
+    p.tiltAngle += 0.1;
+    p.tiltSin = Math.sin(p.tiltAngle);
+    p.tiltCos = Math.cos(p.tiltAngle);
+    p.random = Math.random() + 5;
+    p.wobbleX = p.x + 10 * p.scalar * Math.cos(p.wobble);
+    p.wobbleY = p.y + 10 * p.scalar * Math.sin(p.wobble);
+    const progress = p.tick++ / p.totalTicks;
+    const x1 = p.x + p.random * p.tiltCos;
+    const y1 = p.y + p.random * p.tiltSin;
+    const x2 = p.wobbleX + p.random * p.tiltCos;
+    const y2 = p.wobbleY + p.random * p.tiltSin;
+    ctx.fillStyle = `rgba(${p.color.r},${p.color.g},${p.color.b},${
+      1 - progress
+    })`;
+    ctx.beginPath();
+    // Only support circle shape for simplicity
+    if (ctx.ellipse) {
+      ctx.ellipse(
+        p.x,
+        p.y,
+        Math.abs(x2 - x1) * p.ovalScalar,
+        Math.abs(y2 - y1) * p.ovalScalar,
+        (Math.PI / 10) * p.wobble,
+        0,
+        2 * Math.PI
+      );
+    } else {
+      // Fallback for older browsers
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((Math.PI / 10) * p.wobble);
+      ctx.scale(
+        Math.abs(x2 - x1) * p.ovalScalar,
+        Math.abs(y2 - y1) * p.ovalScalar
+      );
+      ctx.arc(0, 0, 1, 0, 2 * Math.PI);
+      ctx.restore();
+    }
+    ctx.closePath();
+    ctx.fill();
+    return p.tick < p.totalTicks;
+  }
+
+  static fire(options = {}) {
+    // Merge options with defaults
+    const opts = { ...RegiveConfetti.DEFAULTS, ...options };
+    // Convert colors to rgb
+    const colors = (opts.colors || RegiveConfetti.DEFAULTS.colors).map(
+      RegiveConfetti.hexToRgb
+    );
+    const particleCount = Math.max(0, Math.floor(opts.particleCount));
+    const angle = Number(opts.angle);
+    const spread = Number(opts.spread);
+    const startVelocity = Number(opts.startVelocity);
+    const decay = Number(opts.decay);
+    const gravity = Number(opts.gravity);
+    const drift = Number(opts.drift);
+    const ticks = Number(opts.ticks);
+    const scalar = Number(opts.scalar);
+    const origin = opts.origin || { x: opts.x, y: opts.y };
+    const zIndex = Number(opts.zIndex);
+
+    // Create canvas
+    const canvas = RegiveConfetti.getCanvas(zIndex);
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+    const size = { width: canvas.width, height: canvas.height };
+
+    // Create particles
+    let particles = [];
+    const startX = size.width * (origin.x ?? 0.5);
+    const startY = size.height * (origin.y ?? 0.5);
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(
+        RegiveConfetti.randomPhysics({
+          x: startX,
+          y: startY,
+          angle,
+          spread,
+          startVelocity,
+          color: colors[i % colors.length],
+          ticks,
+          decay,
+          gravity,
+          drift,
+          scalar,
+        })
+      );
+    }
+
+    // Animation loop
+    function animate() {
+      ctx.clearRect(0, 0, size.width, size.height);
+      particles = particles.filter((p) =>
+        RegiveConfetti.updateParticle(ctx, p)
+      );
+      if (particles.length) {
+        requestAnimationFrame(animate);
+      } else {
+        document.body.removeChild(canvas);
+      }
+    }
+    animate();
+  }
+}
+
+window.confetti = RegiveConfetti.fire;
+export default RegiveConfetti;
