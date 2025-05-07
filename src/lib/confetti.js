@@ -38,15 +38,37 @@ class RegiveConfetti {
     };
   }
 
+  static _canvas = null;
+  static _activeAnimations = 0;
+
   static getCanvas(zIndex) {
+    // Reuse a single canvas for all confetti bursts
+    if (RegiveConfetti._canvas) {
+      RegiveConfetti._canvas.style.zIndex = zIndex;
+      RegiveConfetti._canvas.style.display = "block";
+      // Resize if needed
+      const w = document.documentElement.clientWidth;
+      const h = document.documentElement.clientHeight;
+      if (
+        RegiveConfetti._canvas.width !== w ||
+        RegiveConfetti._canvas.height !== h
+      ) {
+        RegiveConfetti._canvas.width = w;
+        RegiveConfetti._canvas.height = h;
+      }
+      return RegiveConfetti._canvas;
+    }
     const canvas = document.createElement("canvas");
     canvas.style.position = "fixed";
     canvas.style.top = "0px";
     canvas.style.left = "0px";
     canvas.style.pointerEvents = "none";
     canvas.style.zIndex = zIndex;
+    canvas.style.willChange = "transform, opacity";
     canvas.width = document.documentElement.clientWidth;
     canvas.height = document.documentElement.clientHeight;
+    document.body.appendChild(canvas);
+    RegiveConfetti._canvas = canvas;
     return canvas;
   }
 
@@ -143,11 +165,11 @@ class RegiveConfetti {
     const origin = opts.origin || { x: opts.x, y: opts.y };
     const zIndex = Number(opts.zIndex);
 
-    // Create canvas
+    // Create/reuse canvas
     const canvas = RegiveConfetti.getCanvas(zIndex);
-    document.body.appendChild(canvas);
     const ctx = canvas.getContext("2d");
     const size = { width: canvas.width, height: canvas.height };
+    RegiveConfetti._activeAnimations++;
 
     // Create particles
     let particles = [];
@@ -180,7 +202,12 @@ class RegiveConfetti {
       if (particles.length) {
         requestAnimationFrame(animate);
       } else {
-        document.body.removeChild(canvas);
+        RegiveConfetti._activeAnimations--;
+        // Hide canvas if no more active animations
+        if (RegiveConfetti._activeAnimations <= 0) {
+          RegiveConfetti._canvas.style.display = "none";
+          ctx.clearRect(0, 0, size.width, size.height);
+        }
       }
     }
     animate();
