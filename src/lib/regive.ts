@@ -188,13 +188,11 @@ export class Regive {
       startVelocity: number;
       ticks: number;
       zIndex: number;
-      useWorker: boolean;
       colors?: string[];
     } = {
       startVelocity: 30,
       ticks: 100,
       zIndex: 100000,
-      useWorker: false,
     };
     if (confettiColors.length > 0) {
       defaults.colors = confettiColors;
