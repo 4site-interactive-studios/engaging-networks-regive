@@ -22,7 +22,10 @@ No third-party libraries are required, and the component is fully customizable t
   - [Test Mode](#test-mode)
   - [Debug Mode](#debug-mode)
   - [Confetti Customization](#confetti-customization)
-  - [Examples](#examples)
+  - [Utility CSS Classes](#utility-css-classes)
+    - [.showif-regive-enabled](#showif-regive-enabled)
+    - [.showif-regive-success](#showif-regive-success)
+  - [Regive Examples](#regive-examples)
   - [Development](#development)
 
 ## Installation
@@ -214,7 +217,43 @@ The confetti animation can be customized or disabled entirely:
 
 The default confetti uses a bunch of colors that Fernando thinks are nice for your carnival.
 
-## Examples
+## Utility CSS Classes
+
+Regive provides two utility CSS classes that allow you to conditionally show content based on the component's state:
+
+### .showif-regive-enabled
+
+Content with this class will only be displayed when Regive is enabled on the page (when it's successfully loaded and initialized).
+
+```html
+<!-- This content will only appear when Regive is enabled -->
+<div class="showif-regive-enabled">
+  <h1>
+    Give a Little More.<br />
+    Help a <span style="color: #de3831">Lot</span> More.
+  </h1>
+</div>
+```
+
+### .showif-regive-success
+
+Content with this class will only be displayed after a successful Regive donation has been made.
+
+```html
+<!-- This content will only appear after a successful additional donation -->
+<div class="showif-regive-success">
+  <h2>Amazing! You've made an additional impact today!</h2>
+  <p>We've sent another confirmation email to your inbox.</p>
+  <p>Thank you for your generosity!</p>
+</div>
+```
+
+These utility classes are useful for:
+
+- Adding instructions or context around the Regive component
+- Showing additional content after a successful donation
+
+## Regive Examples
 
 Here's a complete example with various configuration options:
 
