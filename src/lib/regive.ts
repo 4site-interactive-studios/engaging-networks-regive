@@ -419,6 +419,10 @@ export class Regive {
     if (expField) {
       if (expField instanceof HTMLInputElement) {
         expField.value = tokens.exp || "";
+        this.log("Setting expiration field value", "💾", {
+          field: expField.name,
+          value: tokens.exp || "",
+        });
       } else {
         const expFieldValues = tokens.exp?.includes(",")
           ? tokens.exp.split(",")
@@ -430,6 +434,21 @@ export class Regive {
           expFieldSelects.forEach((select, index) => {
             if (index < expFieldValues.length) {
               select.value = expFieldValues[index].trim();
+              this.log("Setting expiration field value", "💾", {
+                field: select.name,
+                value: expFieldValues[index].trim(),
+              });
+              // If an external script changes the select options, we need to update the selected value
+              const observer = new MutationObserver(() => {
+                if (select.value !== expFieldValues[index].trim()) {
+                  select.value = expFieldValues[index].trim();
+                  this.log("Updating expiration field BACK", "💾", {
+                    field: select.name,
+                    value: expFieldValues[index].trim(),
+                  });
+                }
+              });
+              observer.observe(select, { attributes: true });
             }
           });
         }
