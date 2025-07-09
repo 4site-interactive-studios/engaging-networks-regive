@@ -27,6 +27,11 @@ export class Regive {
     }
     this.log("Initializing Regive class");
 
+    if (this.hasCaptcha()) {
+      this.log("Page has a CAPTCHA. Regive will not run.", "⚠️");
+      return;
+    }
+
     if (!this.isDonationPage()) {
       this.log("Not a donation page. Regive will not run.", "⚠️");
       return;
@@ -47,6 +52,12 @@ export class Regive {
   public static init() {
     const regive = new Regive();
     regive.log("Regive initialized");
+  }
+
+  private hasCaptcha(): boolean {
+    const hasCaptcha = !!document.querySelector(".g-recaptcha");
+    this.log("Checking if the page has a CAPTCHA", "ℹ️", { hasCaptcha });
+    return hasCaptcha;
   }
 
   private isDonationPage(): boolean {
@@ -468,6 +479,7 @@ export class Regive {
     }
     this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
     this.ENgrid.setFieldValue("transaction.recurrpay", "");
+    this.ENgrid.setPaymentType("card");
 
     this.log("Writing hidden fields to the form", "💾", {
       source,

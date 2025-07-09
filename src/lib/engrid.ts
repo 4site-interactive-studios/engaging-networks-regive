@@ -284,27 +284,59 @@ export abstract class ENGrid {
   }
   // Set the Payment Type
   static setPaymentType(paymentType: string) {
-    const enFieldPaymentType = ENGrid.getField(
-      "transaction.paymenttype"
-    ) as HTMLSelectElement;
-    if (enFieldPaymentType) {
-      const paymentTypeOption = Array.from(enFieldPaymentType.options).find(
-        (option) =>
-          paymentType.toLowerCase() === "card"
-            ? ["card", "visa", "vi"].includes(option.value.toLowerCase())
-            : paymentType.toLowerCase() === option.value.toLowerCase()
-      );
-      if (paymentTypeOption) {
-        paymentTypeOption.selected = true;
-        enFieldPaymentType.value = paymentTypeOption.value;
-      } else {
-        enFieldPaymentType.value = paymentType;
-      }
-      const event = new Event("change", {
-        bubbles: true,
-        cancelable: true,
-      });
-      enFieldPaymentType.dispatchEvent(event);
+    const paymentTypeFields = document.querySelectorAll(
+      '[name="transaction.paymenttype"]'
+    ) as NodeListOf<HTMLInputElement | HTMLSelectElement>;
+
+    if (paymentTypeFields.length === 0) {
+      // Create a hidden field if no payment type field exists
+      const hiddenField = document.createElement("input");
+      hiddenField.type = "hidden";
+      hiddenField.name = "transaction.paymenttype";
+      hiddenField.value = paymentType;
+      ENGrid.enForm.appendChild(hiddenField);
+      return;
     }
+
+    paymentTypeFields.forEach((field) => {
+      if (field.tagName === "SELECT") {
+        const selectField = field as HTMLSelectElement;
+        const paymentTypeOption = Array.from(selectField.options).find(
+          (option) =>
+            paymentType.toLowerCase() === "card"
+              ? ["card", "visa", "vi"].includes(option.value.toLowerCase())
+              : paymentType.toLowerCase() === option.value.toLowerCase()
+        );
+        if (paymentTypeOption) {
+          paymentTypeOption.selected = true;
+          selectField.value = paymentTypeOption.value;
+        } else {
+          selectField.value = paymentType;
+        }
+        const event = new Event("change", {
+          bubbles: true,
+          cancelable: true,
+        });
+        selectField.dispatchEvent(event);
+      } else if (field.type === "radio") {
+        const radioField = field as HTMLInputElement;
+        const shouldCheck =
+          paymentType.toLowerCase() === "card"
+            ? ["card", "visa", "vi"].includes(radioField.value.toLowerCase())
+            : paymentType.toLowerCase() === radioField.value.toLowerCase();
+
+        if (shouldCheck) {
+          radioField.checked = true;
+          const event = new Event("change", {
+            bubbles: true,
+            cancelable: true,
+          });
+          radioField.dispatchEvent(event);
+        }
+      } else if (field.type === "hidden") {
+        const hiddenField = field as HTMLInputElement;
+        hiddenField.value = paymentType;
+      }
+    });
   }
 }

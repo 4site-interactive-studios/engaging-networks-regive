@@ -44,6 +44,8 @@ No third-party libraries are required, and the component is fully customizable t
    <script src="/path/to/regive.min.js"></script>
    ```
 
+**Note:** It is important that the Regive script gets loaded on **both** the first page of your donation form and the Thank You page. This is because the Regive component needs to be initialized on the first page to understand the details of the donation being made and then embed an iframe on the Thank You page to display the regive component. If you are testing Regive and don't want to add it to your page template just yet, you can add it via Code Blocks on the first page and the Thank You page of your donation form.
+
 ## Basic Usage
 
 Add the `<regive>` tag to your "Thank You" page in Engaging Networks. The component will only work on Donation/Premium Gift pages. Here's a basic example:
