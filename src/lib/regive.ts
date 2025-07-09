@@ -480,6 +480,17 @@ export class Regive {
     if (verField) {
       verField.value = tokens.ver || "";
     }
+    const cardTypeField = this.ENgrid.getField(
+      "transaction.vgs.cardType"
+    ) as HTMLInputElement;
+    if (cardTypeField) {
+      cardTypeField.value = tokens.card || "";
+    } else {
+      this.ENgrid.createHiddenInput(
+        "transaction.vgs.cardType",
+        tokens.card || ""
+      );
+    }
     this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
     this.ENgrid.setFieldValue("transaction.recurrpay", "");
     this.ENgrid.setPaymentType("card");
@@ -514,7 +525,8 @@ export class Regive {
     const hasTokens = !!(
       localStorage.getItem("regive-num") &&
       localStorage.getItem("regive-ver") &&
-      localStorage.getItem("regive-exp")
+      localStorage.getItem("regive-exp") &&
+      localStorage.getItem("regive-card")
     );
     this.log("Checking if VGS tokens exist in localStorage", "ℹ️", {
       hasTokens,
@@ -526,16 +538,19 @@ export class Regive {
     num: string | null;
     ver: string | null;
     exp: string | null;
+    card: string | null;
   } {
     const num = localStorage.getItem("regive-num");
     const ver = localStorage.getItem("regive-ver");
     const exp = localStorage.getItem("regive-exp");
+    const card = localStorage.getItem("regive-card");
     this.log("Retrieving VGS tokens from localStorage", "💾", {
       num,
       ver,
       exp,
+      card,
     });
-    return { num, ver, exp };
+    return { num, ver, exp, card };
   }
 
   private clearVgsTokens() {
@@ -543,6 +558,7 @@ export class Regive {
     localStorage.removeItem("regive-num");
     localStorage.removeItem("regive-ver");
     localStorage.removeItem("regive-exp");
+    localStorage.removeItem("regive-card");
     localStorage.removeItem("regive-submitted");
     localStorage.removeItem("regive-height");
   }
@@ -652,6 +668,7 @@ export class Regive {
       saveFieldToStorage("transaction.ccnumber", "regive-num");
       saveFieldToStorage("transaction.ccvv", "regive-ver");
       saveFieldToStorage("transaction.ccexpire", "regive-exp");
+      saveFieldToStorage("transaction.vgs.cardType", "regive-card");
     });
 
     // Start observing the form
