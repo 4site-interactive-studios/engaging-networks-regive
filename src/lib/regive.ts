@@ -421,6 +421,9 @@ export class Regive {
     ) as HTMLInputElement;
     if (sourceField) {
       sourceField.value = source;
+    } else {
+      // Create the source field if it doesn't exist
+      this.ENgrid.createHiddenInput("supporter.appealCode", source);
     }
 
     const expField = this.ENgrid.getField(

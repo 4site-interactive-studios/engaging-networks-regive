@@ -31,6 +31,51 @@ export abstract class ENGrid {
     }
     return null;
   }
+  // Create a hidden input field
+  static createHiddenInput(name: string, value: string = "") {
+    const formBlock = document.createElement("div");
+    formBlock.classList.add(
+      "en__component",
+      "en__component--formblock",
+      "hide"
+    );
+
+    const textField = document.createElement("div");
+    textField.classList.add("en__field", "en__field--text");
+
+    const textElement = document.createElement("div");
+    textElement.classList.add("en__field__element", "en__field__element--text");
+
+    const inputField = document.createElement("input");
+    inputField.classList.add(
+      "en__field__input",
+      "en__field__input--text",
+      "engrid-added-input"
+    );
+    inputField.setAttribute("name", name);
+    inputField.setAttribute("type", "hidden");
+    inputField.setAttribute("value", value);
+
+    textElement.appendChild(inputField);
+    textField.appendChild(textElement);
+    formBlock.appendChild(textField);
+    const submitElement = document.querySelector(
+      ".en__submit"
+    ) as HTMLDivElement;
+    if (submitElement) {
+      const lastFormComponent = submitElement.closest(".en__component");
+      if (lastFormComponent) {
+        // Insert the new field after the submit button
+        lastFormComponent.parentNode?.insertBefore(
+          formBlock,
+          lastFormComponent.nextSibling
+        );
+      }
+    } else {
+      ENGrid.enForm.appendChild(formBlock);
+    }
+    return inputField;
+  }
   static getField(name: string) {
     // Get the field by name
     return document.querySelector(`[name="${name}"]`);
@@ -290,11 +335,7 @@ export abstract class ENGrid {
 
     if (paymentTypeFields.length === 0) {
       // Create a hidden field if no payment type field exists
-      const hiddenField = document.createElement("input");
-      hiddenField.type = "hidden";
-      hiddenField.name = "transaction.paymenttype";
-      hiddenField.value = paymentType;
-      ENGrid.enForm.appendChild(hiddenField);
+      ENGrid.createHiddenInput("transaction.paymenttype", paymentType);
       return;
     }
 
