@@ -29,7 +29,7 @@ export default defineConfig({
  *  //                                                //
  *  //            Engaging Networks Regive            //
  *  //                                                //
- *  //            Fernando Santos [<(🔵)>]            //
+ *  //            Fernando Santos [<(-)>]             //
  *  //          fernando[at]4sitestudios.com          //
  *  //                                                //
  *  //        Build Date:  ${new Date().toLocaleDateString("en-US", {
