@@ -29,11 +29,13 @@ export class Regive {
 
     if (this.hasCaptcha()) {
       this.log("Page has a CAPTCHA. Regive will not run.", "⚠️");
+      this.exit();
       return;
     }
 
     if (!this.isDonationPage()) {
       this.log("Not a donation page. Regive will not run.", "⚠️");
+      this.exit();
       return;
     }
 
@@ -90,20 +92,19 @@ export class Regive {
       this.log("Page is embedded", "ℹ️");
       this.loadOptionsFromUrl();
       const submissionFailed = !!(
-        this.ENgrid.checkNested(
+        (this.ENgrid.checkNested(
           window.EngagingNetworks,
           "require",
           "_defined",
           "enjs",
           "checkSubmissionFailed"
         ) &&
-        window.EngagingNetworks?.require._defined.enjs.checkSubmissionFailed()
+          window.EngagingNetworks?.require._defined.enjs.checkSubmissionFailed()) ||
+        !!document.querySelector(".en__errorList li")
       );
       if (submissionFailed) {
         this.log("Server-side submission failed. Exiting", "🔴");
-        this.hideAll();
-        this.sendHeightToParent();
-        this.sendMessageToParent("loaded");
+        this.exit();
         return;
       }
       if (this.hasVgsTokens() && this.isChained) {
@@ -118,9 +119,7 @@ export class Regive {
         this.sendMessageToParent("loaded");
       } else {
         this.log("Conditions not met to modify the embedded page", "⚠️");
-        this.hideAll();
-        this.sendHeightToParent();
-        this.sendMessageToParent("loaded");
+        this.exit();
       }
     } else {
       this.log("Page is not embedded. Watching tokens", "🟢");
@@ -148,6 +147,7 @@ export class Regive {
         this.sendMessageToParent("success");
       } else {
         this.log("Form was not submitted via Regive", "⚠️");
+        this.exit();
       }
     } else {
       this.log(
@@ -495,6 +495,14 @@ export class Regive {
     this.ENgrid.setFieldValue("transaction.recurrpay", "");
     this.ENgrid.setPaymentType("card");
 
+    // Uncheck the fee cover box if it exists
+    const feeCover = this.ENgrid.getField(
+      "transaction.feecover"
+    ) as HTMLInputElement;
+    if (feeCover && feeCover.checked) {
+      feeCover.checked = false;
+    }
+
     this.log("Writing hidden fields to the form", "💾", {
       source,
       tokens,
@@ -606,7 +614,6 @@ export class Regive {
       iframe.style.border = "none";
       iframe.setAttribute("scrolling", "no");
       iframe.setAttribute("width", "1px");
-      iframe.setAttribute("scrolling", "no");
       iframe.setAttribute("class", "regive-iframe");
       iframe.setAttribute("frameborder", "0");
       iframe.setAttribute("allowfullscreen", "true");
@@ -915,6 +922,13 @@ export class Regive {
             iframeContainer.style.display = "none";
           }
           break;
+        case "exit":
+          this.log("Child iframe requested exit", "🚪");
+          this.ENgrid.setBodyData("enabled", "false");
+          if (iframeContainer) {
+            iframeContainer.remove();
+          }
+          break;
         default:
           this.log("Unknown action received from child iframe", "🔴", data);
           break;
@@ -992,6 +1006,14 @@ export class Regive {
       form.submit();
     } else {
       this.log("Form not found. Cannot submit.", "🔴");
+    }
+  }
+  // Exit the Regive Process
+  public exit() {
+    this.log("Exiting Regive process", "🚪");
+    this.clearVgsTokens();
+    if (this.isEmbedded) {
+      this.sendMessageToParent("exit");
     }
   }
 }
