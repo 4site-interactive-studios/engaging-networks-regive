@@ -911,23 +911,23 @@ export class Regive {
           break;
         case "height":
           if (data.value && data.value > 0) {
-            if (iframeContainer) {
-              iframeContainer.style.height = data.value + "px";
-              (iframe as HTMLIFrameElement).style.height = data.value + "px";
-              (iframe as HTMLIFrameElement).style.width = "100%";
-              this.log("Iframe height set to", "📏", data.value);
-            }
+            iframeContainer.style.height = data.value + "px";
+            (iframe as HTMLIFrameElement).style.height = data.value + "px";
+            (iframe as HTMLIFrameElement).style.width = "100%";
+            this.log("Iframe height set to", "📏", data.value);
           } else {
             this.log("Hiding iframe container", "🙈");
             iframeContainer.style.display = "none";
           }
           break;
         case "exit":
+          if (iframeContainer.classList.contains("regive-success")) {
+            this.log("Donation was successful, not exiting", "🟢");
+            return;
+          }
           this.log("Child iframe requested exit", "🚪");
           this.ENgrid.setBodyData("enabled", "false");
-          if (iframeContainer) {
-            iframeContainer.remove();
-          }
+          iframeContainer.remove();
           break;
         default:
           this.log("Unknown action received from child iframe", "🔴", data);
