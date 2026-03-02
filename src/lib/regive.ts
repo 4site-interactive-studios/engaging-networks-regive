@@ -491,8 +491,7 @@ export class Regive {
         tokens.card || ""
       );
     }
-    this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
-    this.ENgrid.setFieldValue("transaction.recurrpay", "");
+    this.setOneTimeFrequency();
     this.ENgrid.setPaymentType("card");
 
     // Uncheck the fee cover box if it exists
@@ -1068,6 +1067,31 @@ export class Regive {
       this.log("Form not found. Cannot submit.", "🔴");
     }
   }
+  private setOneTimeFrequency() {
+    this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
+    const recurrpayField = this.ENgrid.getField("transaction.recurrpay");
+    if (
+      recurrpayField &&
+      recurrpayField instanceof HTMLInputElement &&
+      recurrpayField.type === "radio"
+    ) {
+      // When it's a radio box, check the option with value="N"
+      const radioOptions = document.querySelectorAll(
+        'input[name="transaction.recurrpay"]'
+      ) as NodeListOf<HTMLInputElement>;
+      radioOptions.forEach((radio) => {
+        if (radio.value === "N") {
+          radio.checked = true;
+          this.log("Set recurrpay radio to N", "💾");
+        }
+      });
+    } else {
+      // When it's a hidden field, set the value to empty
+      this.ENgrid.setFieldValue("transaction.recurrpay", "");
+    }
+    this.log("Set one-time frequency", "💾");
+  }
+
   // Exit the Regive Process
   public exit() {
     this.log("Exiting Regive process", "🚪");
