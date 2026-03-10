@@ -588,6 +588,11 @@ export class Regive {
     localStorage.removeItem("regive-submitted");
     localStorage.removeItem("regive-height");
   }
+  
+  private appendToUrl(url: string, params: string): string {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}${params}`;
+  }
 
   private isOptionEnabled(value: string | null): boolean {
     if (!value) return false;
@@ -615,32 +620,36 @@ export class Regive {
 
       // Build the iframe src URL with options
       let iframeSrc = `${window.location.href}`;
-      if (basePage && basePage.match(/^https?:\/\//)) {
+      if (basePage && /^https?:\/\//.test(basePage)) {
         this.log("Using absolute URL for iframe source", "ℹ️", { basePage });
-        // Merge the basePage URL with the current URL parameters
-        const basePageUrl = new URL(basePage);
-        const currentUrlParams = new URLSearchParams(window.location.search);
-        currentUrlParams.forEach((value, key) => {
-          basePageUrl.searchParams.append(key, value);
-        });
-        iframeSrc = basePageUrl.toString();
-      } else if (basePage && basePage.match(/^[0-9]+$/)) {
+        iframeSrc = basePage;
+      } else if (basePage && /^\d+$/.test(basePage)) {
         this.log("Using relative URL for iframe source", "ℹ️", { basePage });
-        const currentUrl = new URL(window.location.href);
-        currentUrl.pathname = currentUrl.pathname.replace(/page\/[0-9]+/, `page/${basePage}`);
+        const currentUrl = new URL(iframeSrc);
+        currentUrl.pathname = `/page/${basePage}/donate/1`;
         iframeSrc = currentUrl.toString();
+      } else {
+        // Replace the current page with /1 from the end of the URL
+        const fallbackPagePathRegex = new RegExp(`/page/(\\d+)/([a-zA-Z]+)/${this.ENgrid.getPageNumber()}`);
+        iframeSrc = iframeSrc.replace(fallbackPagePathRegex, "/page/$1/$2/1");
       }
-      // Replace the current page with /1 from the end of the URL
-      const pageNumber = this.ENgrid.getPageNumber();
-      const baseUrlWithoutPage = iframeSrc.replace(`/${pageNumber}`, "");
-      const baseUrlWithPage = `${baseUrlWithoutPage}/1`;
 
-      const separator = iframeSrc.includes("?") ? "&" : "?";
-      iframe.src = `${baseUrlWithPage}${separator}chain${
-        optionsStr ? "&" + optionsStr : ""
-      }`;
+      // Add chain parameter if not already present
+      if (!/[?&]chain($|&)/.test(iframeSrc) && !/^chain($|&)/.test(optionsStr)) {
+        iframeSrc = this.appendToUrl(iframeSrc, "chain");
+        this.log("Added chain parameter", "ℹ️");
+      } else {
+        this.log("IFrame Source already has chain parameter, skipping addition", "ℹ️");
+      }
 
-      this.log("Setting iframe source", "🔗", { src: iframe.src });
+      // Append additional options if provided
+      if (optionsStr) {
+        this.log("Appending options to iframe source", "ℹ️", { optionsStr });
+        iframeSrc = this.appendToUrl(iframeSrc, optionsStr);
+      }
+
+      this.log("Setting iframe source", "🔗", { src: iframeSrc });
+      iframe.src = iframeSrc;
 
       // Generate iframe ID
       this.iFrameId = `regive-iframe-${Math.random()
