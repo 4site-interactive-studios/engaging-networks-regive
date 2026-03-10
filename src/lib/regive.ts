@@ -1,5 +1,6 @@
 import { ENGrid } from "./engrid";
 import { RegiveOptions } from "./regive-options";
+import { RegiveLightboxModal } from "./regive-lightbox";
 import "./confetti";
 
 export class Regive {
@@ -9,7 +10,10 @@ export class Regive {
   private options: RegiveOptions | undefined;
   private readonly isEmbedded: boolean = window !== window.parent;
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
+  private isExited: boolean = false;
   private iFrameId: string | null = null;
+  private lightbox: RegiveLightboxModal | null = null;
+
 
   private readonly themes = [
     "button-right",
@@ -53,7 +57,11 @@ export class Regive {
   // Create init function
   public static init() {
     const regive = new Regive();
-    regive.log("Regive initialized");
+    if(!regive.isExited) {
+      regive.log("Regive initialized");
+    } else {
+      regive.log("Regive initialization was exited", "🚪");
+    }
   }
 
   private hasCaptcha(): boolean {
@@ -525,14 +533,15 @@ export class Regive {
   }
   private hasRequiredFields(): boolean {
     const requiredFields = document.querySelectorAll(".en__mandatory input") as NodeListOf<HTMLInputElement>;
+    let allFilled = true;
     requiredFields.forEach((field) => {
-      if(field.id.includes("transaction")) return; // Skip transaction fields as they are handled separately
+      if(field.id.includes("transaction") || field.name.includes("transaction") || field.classList.contains("en__field__input--other")) return;
       if (!field.value) {
         this.log("Required field is empty", "🔴", { field: field.name });
-        return false;
+        allFilled = false;
       }
     });
-    return true;
+    return allFilled;
   }
   private hasVgsTokens(): boolean {
     if (this.options?.test) {
@@ -580,6 +589,11 @@ export class Regive {
     localStorage.removeItem("regive-height");
   }
 
+  private isOptionEnabled(value: string | null): boolean {
+    if (!value) return false;
+    return ["true", "1", "yes", "on"].includes(value.toLowerCase());
+  }
+
   private replaceRegiveTagWithIframe() {
     const regiveTags = document.querySelectorAll("regive");
     regiveTags.forEach((regiveTag) => {
@@ -593,6 +607,7 @@ export class Regive {
       const txtColor = regiveTag.getAttribute("txt-color") || "#333";
       const test = regiveTag.getAttribute("test") || "false";
       const basePage = regiveTag.getAttribute("base-page") || "";
+      const lightbox = this.isOptionEnabled(regiveTag.getAttribute("lightbox"));
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -672,6 +687,18 @@ export class Regive {
 
       // Replace the regive tag with our iframe
       regiveTag.replaceWith(regiveContainer);
+
+      if (lightbox) {      
+        this.lightbox = new RegiveLightboxModal();
+        // Auto-open if conditions are met
+        this.log("Opening lightbox modal", "🟢");
+        window.setTimeout(() => {
+          if(!this.isExited) {
+            this.lightbox!.open();
+          }
+        }, 750);
+      }
+      // Replace the regive tag with our iframe
     });
   }
 
@@ -946,12 +973,17 @@ export class Regive {
           }
           break;
         case "exit":
+          this.isExited = true;
           if (iframeContainer.classList.contains("regive-success")) {
             this.log("Donation was successful, not exiting", "🟢");
             return;
           }
           this.log("Child iframe requested exit", "🚪");
           this.ENgrid.setBodyData("enabled", "false");
+
+          if (this.lightbox) {
+            this.lightbox.close();
+          }
           iframeContainer.remove();
           break;
         default:
@@ -1094,6 +1126,7 @@ export class Regive {
 
   // Exit the Regive Process
   public exit() {
+    this.isExited = true;
     this.log("Exiting Regive process", "🚪");
     this.clearVgsTokens();
     if (this.isEmbedded) {
