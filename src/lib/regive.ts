@@ -9,6 +9,7 @@ export class Regive {
   private options: RegiveOptions | undefined;
   private readonly isEmbedded: boolean = window !== window.parent;
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
+  private isExited: boolean = false;
   private iFrameId: string | null = null;
 
   private readonly themes = [
@@ -53,7 +54,11 @@ export class Regive {
   // Create init function
   public static init() {
     const regive = new Regive();
-    regive.log("Regive initialized");
+    if(!regive.isExited) {
+      regive.log("Regive initialized");
+    } else {
+      regive.log("Regive initialization was exited", "🚪");
+    }
   }
 
   private hasCaptcha(): boolean {
@@ -525,14 +530,15 @@ export class Regive {
   }
   private hasRequiredFields(): boolean {
     const requiredFields = document.querySelectorAll(".en__mandatory input") as NodeListOf<HTMLInputElement>;
+    let allFilled = true;
     requiredFields.forEach((field) => {
-      if(field.id.includes("transaction")) return; // Skip transaction fields as they are handled separately
+      if(field.id.includes("transaction") || field.name.includes("transaction") || field.classList.contains("en__field__input--other")) return;
       if (!field.value) {
         this.log("Required field is empty", "🔴", { field: field.name });
-        return false;
+        allFilled = false;
       }
     });
-    return true;
+    return allFilled;
   }
   private hasVgsTokens(): boolean {
     if (this.options?.test) {
@@ -955,6 +961,7 @@ export class Regive {
           }
           break;
         case "exit":
+          this.isExited = true;
           if (iframeContainer.classList.contains("regive-success")) {
             this.log("Donation was successful, not exiting", "🟢");
             return;
@@ -1103,6 +1110,7 @@ export class Regive {
 
   // Exit the Regive Process
   public exit() {
+    this.isExited = true;
     this.log("Exiting Regive process", "🚪");
     this.clearVgsTokens();
     if (this.isEmbedded) {
