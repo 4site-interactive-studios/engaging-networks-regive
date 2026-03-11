@@ -1,0 +1,188 @@
+[data-engrid-has-lightbox] {
+  overflow: hidden;
+}
+#enModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 2147483645;
+  background-color: rgba(0, 0, 0, 0.85);
+  width: 100vw;
+  height: 100%;
+  -webkit-transition: top 0.4s ease-in-out;
+  transition: top 0.4s ease-in-out;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-y: scroll; // Scroll vertically (used when modal contents are larger than the viewport)
+  overflow-x: hidden; // Do not scroll horizontally
+
+  &.is-hidden {
+    top: -500vh;
+    transition: none; /* When the modal gains the "is-hidden" class it will dissapear instantly */
+  }
+
+  &.image-right {
+    #goMonthly {
+      grid-template-columns: 1fr minmax(0, 480px) !important;
+    }
+
+    .background {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .upsellLightboxContent {
+      grid-column: 1;
+      grid-row: 1;
+    }
+  }
+
+  &.is-submitting {
+    .loader-wrapper {
+      visibility: visible !important;
+    }
+
+    span.label {
+      visibility: hidden;
+    }
+
+    #upsellYesButton a,
+    #upsellNoButton button {
+      background-color: #ccc;
+      border-color: #ccc;
+    }
+  }
+}
+
+// generic modal styles
+.regive-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  overflow-y: auto;
+
+  &.modal--hidden {
+    display: none;
+  }
+
+}
+
+.regive-modal__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 28px 20px;
+  overflow-y: auto;
+}
+
+.regive-modal.regive-modal--no-exit-intent .regive-modal__overlay {
+  pointer-events: none;
+}
+
+.regive-modal__container {
+  max-width: 700px;
+  width: 100%;
+  position: relative;
+  background-color: #ffffff;
+  padding: 0;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  border: 1px solid #cdcdcd;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.regive-modal:not(.regive-modal--close-x) .regive-modal__close-x, .regive-modal.regive-modal--no-exit-intent .regive-modal__close-x {
+  display: none;
+}
+
+.regive-modal__close {
+  position: absolute;
+  right: 15px;
+  top: 8px;
+  cursor: pointer;
+  font-size: 20px;
+  z-index: 1;
+  background: rgba(255,255,255,.5);
+  padding: 0px 8px;
+  border-radius: 100%;
+}
+
+.regive-modal__close:hover {
+  background: rgba(255,255,255,.8);
+  color: red;
+}
+
+.regive-modal__body {
+  width: 100%;
+  margin: 0 auto;
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  .regive-container {
+    margin: 0;
+  }
+}
+
+.regive-modal__button {
+  margin: 10px auto;
+}
+
+.regive-modal.regive-modal.regive-modal--no-exit-intent .regive-modal__button {
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.6;
+}
+
+@keyframes scaleAnimation {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.regive-modal--scale {
+  animation: scaleAnimation 0.5s ease-in-out;
+  transform-origin: center;
+}
+
+.regive-placeholder {
+  background: rgba(0, 0, 0, 0.15);
+  &::after {
+    content: "";
+    position: absolute;
+    top: calc(50% - 1rem);
+    left: calc(50% - 1rem);
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 0.25rem solid #ccc;
+    border-top-color: var(--regive-txt-color, #333);
+    animation: spin 1s linear infinite;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    transition: opacity 0.3s;
+    opacity: 1;
+    pointer-events: none;
+    cursor: default;
+  }
+}
