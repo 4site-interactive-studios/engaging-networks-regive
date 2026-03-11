@@ -11,6 +11,7 @@ export class Regive {
   private readonly isEmbedded: boolean = window !== window.parent;
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
   private isExited: boolean = false;
+  private isSuccessful: boolean = false;
   private iFrameId: string | null = null;
   private lightbox: RegiveLightboxModal | null = null;
 
@@ -532,6 +533,10 @@ export class Regive {
     return false;
   }
   private hasRequiredFields(): boolean {
+    if (this.options?.test) {
+      this.log("Test mode enabled. Skipping required fields check", "⚠️");
+      return true;
+    }
     const requiredFields = document.querySelectorAll(".en__mandatory input") as NodeListOf<HTMLInputElement>;
     let allFilled = true;
     requiredFields.forEach((field) => {
@@ -698,11 +703,12 @@ export class Regive {
       regiveTag.replaceWith(regiveContainer);
 
       if (lightbox) {      
-        this.lightbox = new RegiveLightboxModal();
         // Auto-open if conditions are met
-        this.log("Opening lightbox modal", "🟢");
         window.setTimeout(() => {
+          this.lightbox = new RegiveLightboxModal(this.log);
+          console.log(this.isExited, "isExited value in timeout");
           if(!this.isExited) {
+            this.log("Opening lightbox modal", "🟢");
             this.lightbox!.open();
           }
         }, 750);
@@ -940,10 +946,16 @@ export class Regive {
         case "loaded":
           iframeContainer.classList.add("regive-loaded");
           iframeContainer.classList.remove("regive-loading");
+          if(this.lightbox) {
+            this.lightbox.unlockExitIntent();
+          }
           break;
         case "loading":
           iframeContainer.classList.add("regive-loading");
           iframeContainer.classList.remove("regive-loaded");
+          if(this.lightbox) {
+            this.lightbox.lockExitIntent();
+          }
           break;
         case "celebrate":
           this.celebrate(
@@ -961,6 +973,12 @@ export class Regive {
           if (iframeContainer.dataset.test !== "true") {
             this.clearVgsTokens();
           }
+          this.isSuccessful = true;
+          if (this.lightbox) {
+            setTimeout(()=>{
+              this.lightbox?.close();
+            },3500);
+          }
           break;
         case "reset":
           const iframeContainerParentReset =
@@ -975,8 +993,11 @@ export class Regive {
             iframeContainer.style.height = data.value + "px";
             (iframe as HTMLIFrameElement).style.height = data.value + "px";
             (iframe as HTMLIFrameElement).style.width = "100%";
+            if(this.lightbox) {
+              this.lightbox.updatePlaceholderHeight(data.value);
+            }
             this.log("Iframe height set to", "📏", data.value);
-          } else {
+          } else if (!this.isSuccessful) {
             this.log("Hiding iframe container", "🙈");
             iframeContainer.style.display = "none";
           }

@@ -32,7 +32,7 @@ export abstract class Modal {
 
   private createModal(): void {
     this.modal = document.createElement("div");
-    this.modal.classList.add("engrid-modal", "modal--hidden");
+    this.modal.classList.add("regive-modal", "modal--hidden");
     if (this.options.customClass && this.options.customClass !== "") {
       this.options.customClass.split(" ").forEach((customClass) => {
         if (!customClass) return;
@@ -40,26 +40,26 @@ export abstract class Modal {
       });
     }
     if (this.options.showCloseX) {
-      this.modal.classList.add("engrid-modal--close-x");
+      this.modal.classList.add("regive-modal--close-x");
     }
     this.modal.setAttribute("aria-hidden", "true");
     this.modal.setAttribute("role", "dialog");
     this.modal.setAttribute("aria-modal", "true");
     this.modal.setAttribute("tabindex", "-1");
     this.modal.innerHTML = `
-      <div class="engrid-modal__overlay" tabindex="-1">
-        <div class="engrid-modal__container" tabindex="0">
-          <div class="engrid-modal__close engrid-modal__close-x" role="button" tabindex="0" aria-label="Close">
+      <div class="regive-modal__overlay" tabindex="-1">
+        <div class="regive-modal__container" tabindex="0">
+          <div class="regive-modal__close regive-modal__close-x" role="button" tabindex="0" aria-label="Close">
             X
           </div>
-          <div class="engrid-modal__body"></div>
+          <div class="regive-modal__body"></div>
         </div>
       </div>
     `;
 
     document.body.appendChild(this.modal);
 
-    const modalBody = this.modal.querySelector(".engrid-modal__body");
+    const modalBody = this.modal.querySelector(".regive-modal__body");
 
     if (this.modalContent instanceof NodeList) {
       this.modalContent.forEach((content) => {
@@ -73,7 +73,7 @@ export abstract class Modal {
 
     if (this.options.addCloseButton) {
       const button = document.createElement("button");
-      button.classList.add("engrid-modal__button");
+      button.classList.add("regive-modal__button");
       button.textContent = this.options.closeButtonLabel as string;
       button.addEventListener("click", () => {
         this.close();
@@ -87,24 +87,24 @@ export abstract class Modal {
   private addEventListeners(): void {
     // Close event on top X
     this.modal
-      ?.querySelector(".engrid-modal__close")
+      ?.querySelector(".regive-modal__close")
       ?.addEventListener("click", () => {
         this.close();
       });
 
     // Bounce scale when clicking outside of modal
     this.modal
-      ?.querySelector(".engrid-modal__overlay")
+      ?.querySelector(".regive-modal__overlay")
       ?.addEventListener("click", (event) => {
         if (event.target === event.currentTarget) {
           if (this.options.onClickOutside === "close") {
             this.close();
           } else if (this.options.onClickOutside === "bounce") {
-            const modal = document.querySelector(".engrid-modal");
+            const modal = document.querySelector(".regive-modal");
             if (modal) {
-              modal.classList.remove("engrid-modal--scale");
+              modal.classList.remove("regive-modal--scale");
               void modal.clientWidth;
-              modal.classList.add("engrid-modal--scale");
+              modal.classList.add("regive-modal--scale");
             }
           }
         }
@@ -152,12 +152,20 @@ export abstract class Modal {
     }
   };
 
+  public lockExitIntent(): void {
+    this.modal?.classList.add("regive-modal--no-exit-intent");
+  }
+
+  public unlockExitIntent(): void {
+    this.modal?.classList.remove("regive-modal--no-exit-intent");
+  }
+
   public open(): void {
     ENGrid.setBodyData("has-lightbox", "true");
     this.modal?.classList.remove("modal--hidden");
     this.modal?.removeAttribute("aria-hidden");
     const container = this.modal?.querySelector(
-      ".engrid-modal__container"
+      ".regive-modal__container"
     ) as HTMLElement;
     container?.focus({ preventScroll: true });
     this.modal?.addEventListener("keydown", this.focusTrapHandler);
