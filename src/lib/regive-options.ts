@@ -38,6 +38,9 @@ export interface RegiveOptions {
   /** Source of the donation */
   source?: string;
 
+  /** Base page ID to process the donation through */
+  basePage?: string;
+
   /** Enable test mode without actual form submission */
   test?: boolean;
 }

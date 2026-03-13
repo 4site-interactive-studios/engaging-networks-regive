@@ -9,6 +9,7 @@ export class Regive {
   private options: RegiveOptions | undefined;
   private readonly isEmbedded: boolean = window !== window.parent;
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
+  private isExited: boolean = false;
   private iFrameId: string | null = null;
 
   private readonly themes = [
@@ -53,7 +54,11 @@ export class Regive {
   // Create init function
   public static init() {
     const regive = new Regive();
-    regive.log("Regive initialized");
+    if(!regive.isExited) {
+      regive.log("Regive initialized");
+    } else {
+      regive.log("Regive initialization was exited", "🚪");
+    }
   }
 
   private hasCaptcha(): boolean {
@@ -107,7 +112,7 @@ export class Regive {
         this.exit();
         return;
       }
-      if (this.hasVgsTokens() && this.isChained) {
+      if (this.hasVgsTokens() && this.hasRequiredFields() && this.isChained) {
         this.log(
           "Conditions met to hide the donation form and add a banner",
           "🟢"
@@ -523,7 +528,18 @@ export class Regive {
     this.log("Form was not submitted via Regive", "🔴");
     return false;
   }
-
+  private hasRequiredFields(): boolean {
+    const requiredFields = document.querySelectorAll(".en__mandatory input") as NodeListOf<HTMLInputElement>;
+    let allFilled = true;
+    requiredFields.forEach((field) => {
+      if(field.id.includes("transaction") || field.name.includes("transaction") || field.classList.contains("en__field__input--other")) return;
+      if (!field.value) {
+        this.log("Required field is empty", "🔴", { field: field.name });
+        allFilled = false;
+      }
+    });
+    return allFilled;
+  }
   private hasVgsTokens(): boolean {
     if (this.options?.test) {
       this.log("Test mode enabled. Skipping VGS token check", "⚠️");
@@ -569,6 +585,11 @@ export class Regive {
     localStorage.removeItem("regive-submitted");
     localStorage.removeItem("regive-height");
   }
+  
+  private appendToUrl(url: string, params: string): string {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}${params}`;
+  }
 
   private replaceRegiveTagWithIframe() {
     const regiveTags = document.querySelectorAll("regive");
@@ -582,24 +603,44 @@ export class Regive {
       const bgColor = regiveTag.getAttribute("bg-color") || "#FFF";
       const txtColor = regiveTag.getAttribute("txt-color") || "#333";
       const test = regiveTag.getAttribute("test") || "false";
+      const basePage = regiveTag.getAttribute("base-page") || "";
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
       const iframe = document.createElement("iframe");
 
       // Build the iframe src URL with options
-      const baseUrl = `${window.location.href}`;
-      // Replace the current page with /1 from the end of the URL
-      const pageNumber = this.ENgrid.getPageNumber();
-      const baseUrlWithoutPage = baseUrl.replace(`/${pageNumber}`, "");
-      const baseUrlWithPage = `${baseUrlWithoutPage}/1`;
+      let iframeSrc = `${window.location.href}`;
+      if (basePage && /^https?:\/\//.test(basePage)) {
+        this.log("Using absolute URL for iframe source", "ℹ️", { basePage });
+        iframeSrc = basePage;
+      } else if (basePage && /^\d+$/.test(basePage)) {
+        this.log("Using relative URL for iframe source", "ℹ️", { basePage });
+        const currentUrl = new URL(iframeSrc);
+        currentUrl.pathname = `/page/${basePage}/donate/1`;
+        iframeSrc = currentUrl.toString();
+      } else {
+        // Replace the current page with /1 from the end of the URL
+        const fallbackPagePathRegex = new RegExp(`/page/(\\d+)/([a-zA-Z]+)/${this.ENgrid.getPageNumber()}`);
+        iframeSrc = iframeSrc.replace(fallbackPagePathRegex, "/page/$1/$2/1");
+      }
 
-      const separator = baseUrl.includes("?") ? "&" : "?";
-      iframe.src = `${baseUrlWithPage}${separator}chain${
-        optionsStr ? "&" + optionsStr : ""
-      }`;
+      // Add chain parameter if not already present
+      if (!/[?&]chain($|&)/.test(iframeSrc) && !/^chain($|&)/.test(optionsStr)) {
+        iframeSrc = this.appendToUrl(iframeSrc, "chain");
+        this.log("Added chain parameter", "ℹ️");
+      } else {
+        this.log("IFrame Source already has chain parameter, skipping addition", "ℹ️");
+      }
 
-      this.log("Setting iframe source", "🔗", { src: iframe.src });
+      // Append additional options if provided
+      if (optionsStr) {
+        this.log("Appending options to iframe source", "ℹ️", { optionsStr });
+        iframeSrc = this.appendToUrl(iframeSrc, optionsStr);
+      }
+
+      this.log("Setting iframe source", "🔗", { src: iframeSrc });
+      iframe.src = iframeSrc;
 
       // Generate iframe ID
       this.iFrameId = `regive-iframe-${Math.random()
@@ -920,6 +961,7 @@ export class Regive {
           }
           break;
         case "exit":
+          this.isExited = true;
           if (iframeContainer.classList.contains("regive-success")) {
             this.log("Donation was successful, not exiting", "🟢");
             return;
@@ -949,6 +991,40 @@ export class Regive {
       this.sendMessageToParent("height", height);
     } else {
       this.log("Not in an embedded iFrame. This is a Dev Mistake.", "🔴");
+    }
+  }
+  private setAmount(amount: number) {
+    // Run only if it is a Donation Page with a Donation Amount field
+    if (!document.getElementsByName("transaction.donationAmt").length) {
+      return;
+    }
+    // Search for the current amount on radio boxes
+    let found = Array.from(
+      document.querySelectorAll('input[name="transaction.donationAmt"]')
+    ).filter(
+      (el) => el instanceof HTMLInputElement && parseInt(el.value) == amount
+    );
+    // We found the amount on the radio boxes, so check it
+    const otherField = document.querySelector(
+        'input[name="transaction.donationAmt.other"]'
+      ) as HTMLInputElement;
+    if (found.length) {
+      const amountField = found[0] as HTMLInputElement;
+      amountField.checked = true;
+      // Other amount field value can be set to a previous value with chain links, so we need to clear it to avoid overlapping values
+      if(otherField) {
+        otherField.value = "";
+      }
+    } else if (otherField) {
+        const enFieldOtherAmountRadio = document.querySelector(
+          `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
+        ) as HTMLInputElement;
+        if (enFieldOtherAmountRadio) {
+          enFieldOtherAmountRadio.checked = true;
+        }
+        otherField.value = parseFloat(amount.toString()).toFixed(2);
+    } else {
+      this.log("Could not find a way to set the amount field", "🔴");
     }
   }
   private submitForm(amount: string) {
@@ -991,7 +1067,7 @@ export class Regive {
           amount = (parseFloat(amount) - feeCoverAmount).toFixed(2);
         }
       }
-      this.ENgrid.setAmount(parseFloat(amount));
+      this.setAmount(parseFloat(amount));
       localStorage.setItem(
         "regive-submitted",
         this.ENgrid.getPageID().toString()
@@ -1034,6 +1110,7 @@ export class Regive {
 
   // Exit the Regive Process
   public exit() {
+    this.isExited = true;
     this.log("Exiting Regive process", "🚪");
     this.clearVgsTokens();
     if (this.isEmbedded) {

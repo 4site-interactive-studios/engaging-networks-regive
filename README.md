@@ -106,6 +106,13 @@ Available themes:
 | `confetti` | Enable/disable confetti or set custom colors    | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"` |
 | `test`     | Enable test mode without actual form submission | `test="true"`                                                         | `false`     |
 | `params`   | Additional URL parameters to pass to the iFrame | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`      |
+| `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
+
+#### Base Page Option
+
+By default, Regive processes the additional donation through the same page as the original donation. However, you can specify a different base page for processing the regive donation using the `base-page` attribute. This allows you to route the additional donation through a specific page that may have different settings, configurations, or tracking parameters. In this case, the `base-page` should be set to the page ID of the desired page in Engaging Networks.
+
+**Note:** When using the `base-page` option, make sure that the specified page is properly set up to handle the donation (Contains all necessary fields for Engaging Networks to process the donation), and that it has the Regive script included on both pages. All instructions for "Page 1" of the donation form (such as adding the custom theme template) should be followed for the specified base page.
 
 ## Custom Theming
 
