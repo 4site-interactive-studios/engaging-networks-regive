@@ -112,7 +112,7 @@ export class Regive {
         this.exit();
         return;
       }
-      if (this.hasVgsTokens() && this.hasRequiredFields() && this.isChained) {
+      if (this.hasVgsTokens() && this.isChained) {
         this.log(
           "Conditions met to hide the donation form and add a banner",
           "🟢"
@@ -1045,6 +1045,14 @@ export class Regive {
   private submitForm(amount: string) {
     this.log("Submitting form with amount", "💰", { amount });
     this.sendMessageToParent("loading");
+    if (!this.hasRequiredFields()) {
+      this.log(
+        "Not submitting form because required fields are not filled",
+        "🔴"
+      );
+      this.exit();
+      return;
+    }
     if (this.options?.test) {
       this.log("Test mode enabled. Not submitting the form.", "⚠️");
       window.setTimeout(() => {
