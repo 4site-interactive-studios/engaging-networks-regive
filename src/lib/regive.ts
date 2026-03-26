@@ -2,7 +2,7 @@ import { ENGrid } from "./engrid";
 import { RegiveOptions } from "./regive-options";
 import "./confetti";
 
-const digitalWalletMethods = ["applepay","googlepay","stripedigitalwallet","paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch","digitalwallets-generic","daf"];
+const digitalWalletMethods = ["applepay","googlepay","stripedigitalwallet"]; // currently unsupported: "paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch", "daf"
 
 export class Regive {
   private readonly ENgrid = ENGrid;
@@ -275,7 +275,6 @@ export class Regive {
     const buttonLabel = this.options?.buttonLabel || "Add {{amount}}";
     const buttonLabelRegex = new RegExp("{{amount}}", "g");
     const digitalWalletsEnabled = this.options?.digitalWallets && digitalWalletMethods.includes(paymentMethod);
-    // TODO: If digital wallet and more than one amount, change payment buttons to be a radio select.
     amounts.forEach((amount) => {
       const label = buttonLabel.replace(
         buttonLabelRegex,
@@ -478,20 +477,9 @@ export class Regive {
       }
       if(digitalWalletsWrapper.querySelector("iframe") || (paymentMethod === "daf" && digitalWalletsWrapper.querySelector("#chariot-button"))) {
         this.log("Digital wallets form block found in the page", "🟢");
-        if(paymentMethod == "paypaltouch") {
-          // If paypal one touch, the paypal sdk needs more time to initialize before being relocated
-          this.log("Payment method is PayPal One Touch, waiting 2 seconds for the PayPal SDK to initialize", "⏳");
-          setTimeout(() => {            
-            regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
-            this.addDigitalWalletSubmitListeners(paymentMethod);
-            this.sendMessageToParent("enabled");
-            (digitalWalletsWrapper.querySelector("iframe") as HTMLElement).style.display = "block";
-          }, 1000);
-        } else {
-          regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
-          this.addDigitalWalletSubmitListeners(paymentMethod);
-          this.sendMessageToParent("enabled");
-        }
+        regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
+        this.addDigitalWalletSubmitListeners(paymentMethod);
+        this.sendMessageToParent("enabled");
       } else {
         this.log("Digital wallets form block not found in the page, setting up mutation observer to watch for it", "⚠️");
         const observer = new MutationObserver(() => {
@@ -501,20 +489,9 @@ export class Regive {
             this.log("Digital wallets form block found in the page", "🟢");
             clearTimeout(timer);
             observer.disconnect();
-            if(paymentMethod == "paypaltouch") {
-              // If paypal one touch, the paypal sdk needs more time to initialize before being relocated
-              this.log("Payment method is PayPal One Touch, waiting 2 seconds for the PayPal SDK to initialize", "⏳");
-              setTimeout(() => {
-                regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
-                this.addDigitalWalletSubmitListeners(paymentMethod);
-                this.sendMessageToParent("enabled");
-                (digitalWalletsWrapper.querySelector("iframe") as HTMLElement).style.display = "block";
-              }, 1000);
-            } else {
-              regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
-              this.addDigitalWalletSubmitListeners(paymentMethod);
-              this.sendMessageToParent("enabled");
-            }
+            regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
+            this.addDigitalWalletSubmitListeners(paymentMethod);
+            this.sendMessageToParent("enabled");
           }
         });
         observer.observe(digitalWalletsWrapper, { childList: true, subtree: true });
@@ -656,7 +633,7 @@ export class Regive {
     return false;
   }
   private detectPaymentMethod(): string {
-    const paymentType = localStorage.getItem("regive-paymenttype") || this.hasVgsTokens() ? "card" : "digitalwallet-generic-yes";
+    const paymentType = localStorage.getItem("regive-paymenttype") || (this.hasVgsTokens() ? "card" : "digitalwallet-unknown");
     this.log("Detected payment method", "💳", { paymentType });
     return paymentType;
   }
