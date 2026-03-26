@@ -56,7 +56,7 @@ export class Regive {
   // Create init function
   public static init() {
     const regive = new Regive();
-    if(!regive.isExited) {
+    if (!regive.isExited) {
       regive.log("Regive initialized");
     } else {
       regive.log("Regive initialization was exited", "🚪");
@@ -638,10 +638,17 @@ export class Regive {
     return paymentType;
   }
   private hasRequiredFields(): boolean {
-    const requiredFields = document.querySelectorAll(".en__mandatory input") as NodeListOf<HTMLInputElement>;
+    const requiredFields = document.querySelectorAll(
+      ".en__mandatory:not(.en__hidden) input"
+    ) as NodeListOf<HTMLInputElement>;
     let allFilled = true;
     requiredFields.forEach((field) => {
-      if(field.id.includes("transaction") || field.name.includes("transaction") || field.classList.contains("en__field__input--other")) return;
+      if (
+        field.id.includes("transaction") ||
+        field.name.includes("transaction") ||
+        field.classList.contains("en__field__input--other")
+      )
+        return;
       if (!field.value) {
         this.log("Required field is empty", "🔴", { field: field.name });
         allFilled = false;
@@ -699,7 +706,7 @@ export class Regive {
     localStorage.removeItem("regive-submitted");
     localStorage.removeItem("regive-height");
   }
-  
+
   private appendToUrl(url: string, params: string): string {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}${params}`;
@@ -741,16 +748,24 @@ export class Regive {
         iframeSrc = currentUrl.toString();
       } else {
         // Replace the current page with /1 from the end of the URL
-        const fallbackPagePathRegex = new RegExp(`/page/(\\d+)/([a-zA-Z]+)/${this.ENgrid.getPageNumber()}`);
+        const fallbackPagePathRegex = new RegExp(
+          `/page/(\\d+)/([a-zA-Z]+)/${this.ENgrid.getPageNumber()}`
+        );
         iframeSrc = iframeSrc.replace(fallbackPagePathRegex, "/page/$1/$2/1");
       }
 
       // Add chain parameter if not already present
-      if (!/[?&]chain($|&)/.test(iframeSrc) && !/^chain($|&)/.test(optionsStr)) {
+      if (
+        !/[?&]chain($|&)/.test(iframeSrc) &&
+        !/^chain($|&)/.test(optionsStr)
+      ) {
         iframeSrc = this.appendToUrl(iframeSrc, "chain");
         this.log("Added chain parameter", "ℹ️");
       } else {
-        this.log("IFrame Source already has chain parameter, skipping addition", "ℹ️");
+        this.log(
+          "IFrame Source already has chain parameter, skipping addition",
+          "ℹ️"
+        );
       }
 
       // Append additional options if provided
@@ -1149,23 +1164,23 @@ export class Regive {
     );
     // We found the amount on the radio boxes, so check it
     const otherField = document.querySelector(
-        'input[name="transaction.donationAmt.other"]'
-      ) as HTMLInputElement;
+      'input[name="transaction.donationAmt.other"]'
+    ) as HTMLInputElement;
     if (found.length) {
       const amountField = found[0] as HTMLInputElement;
       amountField.checked = true;
       // Other amount field value can be set to a previous value with chain links, so we need to clear it to avoid overlapping values
-      if(otherField) {
+      if (otherField) {
         otherField.value = "";
       }
     } else if (otherField) {
-        const enFieldOtherAmountRadio = document.querySelector(
-          `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
-        ) as HTMLInputElement;
-        if (enFieldOtherAmountRadio) {
-          enFieldOtherAmountRadio.checked = true;
-        }
-        otherField.value = parseFloat(amount).toFixed(2);
+      const enFieldOtherAmountRadio = document.querySelector(
+        `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
+      ) as HTMLInputElement;
+      if (enFieldOtherAmountRadio) {
+        enFieldOtherAmountRadio.checked = true;
+      }
+      otherField.value = parseFloat(amount.toString()).toFixed(2);
     } else {
       this.log("Could not find a way to set the amount field", "🔴");
     }
@@ -1173,6 +1188,14 @@ export class Regive {
   private submitForm(amount: string) {
     this.log("Submitting form with amount", "💰", { amount });
     this.sendMessageToParent("loading");
+    if (!this.hasRequiredFields()) {
+      this.log(
+        "Not submitting form because required fields are not filled",
+        "🔴"
+      );
+      this.exit();
+      return;
+    }
     if (this.options?.test) {
       this.log("Test mode enabled. Not submitting the form.", "⚠️");
       window.setTimeout(() => {
