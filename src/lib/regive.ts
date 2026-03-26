@@ -2,6 +2,8 @@ import { ENGrid } from "./engrid";
 import { RegiveOptions } from "./regive-options";
 import "./confetti";
 
+const digitalWalletMethods = ["applepay","googlepay","stripedigitalwallet"]; // currently unsupported: "paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch", "daf"
+
 export class Regive {
   private readonly ENgrid = ENGrid;
   private debugMode: boolean = false;
@@ -112,15 +114,17 @@ export class Regive {
         this.exit();
         return;
       }
-      if (this.hasVgsTokens() && this.isChained) {
+      const paymentMethod = (this.options?.test && this.options?.testMethod) ? this.options?.testMethod : this.detectPaymentMethod();
+      this.log("Detected payment method", "💳", paymentMethod);
+      if (((digitalWalletMethods.includes(paymentMethod) && this.options?.digitalWallets) || paymentMethod == "card") && this.hasRequiredFields() && this.isChained) {
         this.log(
           "Conditions met to hide the donation form and add a banner",
           "🟢"
         );
         this.ENgrid.setBodyData("embedded", "true");
         this.hideAll();
-        this.addCustomBanner();
-        this.writeHiddenFields();
+        this.addCustomBanner(paymentMethod);
+        this.writeHiddenFields(paymentMethod);
         this.sendMessageToParent("loaded");
       } else {
         this.log("Conditions not met to modify the embedded page", "⚠️");
@@ -253,7 +257,7 @@ export class Regive {
     return parseFloat(Math.max(0, Math.min(1, normalizedPosition)).toFixed(2));
   }
 
-  private addCustomBanner() {
+  private addCustomBanner(paymentMethod: string) {
     if (this.options?.test) {
       this.log("Adding a custom banner to the page IN TEST MODE", "⚠️");
     } else {
@@ -270,6 +274,7 @@ export class Regive {
     const buttonTxtColor = this.options?.buttonTxtColor || "#FFF";
     const buttonLabel = this.options?.buttonLabel || "Add {{amount}}";
     const buttonLabelRegex = new RegExp("{{amount}}", "g");
+    const digitalWalletsEnabled = this.options?.digitalWallets && digitalWalletMethods.includes(paymentMethod);
     amounts.forEach((amount) => {
       const label = buttonLabel.replace(
         buttonLabelRegex,
@@ -277,6 +282,7 @@ export class Regive {
       );
       labels.push(label);
     });
+
     const heading = this.options?.heading || null;
     let theme = this.options?.theme || "stacked";
     let template;
@@ -300,16 +306,35 @@ export class Regive {
       .regive-heading {
         color: var(--regive-txt-color);
       }
-      .regive-amount-btn {
-        background-color: var(--regive-button-bg-color);
-        color: var(--regive-button-txt-color);
-        border: 1px solid var(--regive-button-bg-color);
-      }
-      .regive-amount-btn:hover {
-        background-color: var(--regive-button-txt-color);
-        color: var(--regive-button-bg-color);
-        border-color: var(--regive-button-bg-color);
-      }
+      ${digitalWalletsEnabled ? `
+        .regive-amount-btn {
+          background-color: var(--regive-button-txt-color);
+          color: var(--regive-button-bg-color);
+          border-color: var(--regive-button-bg-color);
+        }
+        .regive-amount-btn.regive-selected {
+          background-color: var(--regive-button-bg-color);
+          color: var(--regive-button-txt-color);
+          border: 1px solid var(--regive-button-bg-color);
+        }
+        .regive-amount-btn:hover {
+          border: 1px solid var(--regive-button-bg-color);
+        }
+        .regive-wallets-wrapper {
+          margin: 0 20px;
+        }
+        ` : `
+        .regive-amount-btn {
+          background-color: var(--regive-button-bg-color);
+          color: var(--regive-button-txt-color);
+          border: 1px solid var(--regive-button-bg-color);
+        }
+        .regive-amount-btn:hover {
+          background-color: var(--regive-button-txt-color);
+          color: var(--regive-button-bg-color);
+          border-color: var(--regive-button-bg-color);
+        }
+      `}
     </style>
     `;
     // Check if theme is not part of the predefined themes
@@ -334,6 +359,7 @@ export class Regive {
               })
               .join("")}
           </div>
+          ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ''}
           `
             );
           template = template.replace(
@@ -382,6 +408,7 @@ export class Regive {
           })
           .join("")}
       </div>
+      ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ''}
       </div>
     `;
     }
@@ -396,13 +423,13 @@ export class Regive {
     banner.innerHTML = template;
     document.body.appendChild(banner);
     // Create a resize observer to send the height to the parent every time the banner is resized
-    const observer = new ResizeObserver(() => {
+    const resizeObserver = new ResizeObserver(() => {
       const bannerHeight = banner.getBoundingClientRect().height;
       if (bannerHeight > 0) {
         this.sendHeightToParent();
       }
     });
-    observer.observe(banner);
+    resizeObserver.observe(banner);
     // Add event listeners to the buttons
     const buttons = banner.querySelectorAll(".regive-amount-btn");
     buttons.forEach((button) => {
@@ -410,17 +437,77 @@ export class Regive {
         const amount = (event.currentTarget as HTMLButtonElement).dataset
           .amount as string;
         this.log("Amount button clicked", "💰", { amount });
-        this.submitForm(amount);
+        if(digitalWalletsEnabled) {
+          // Mark the button as selected, unmark other buttons.
+          buttons.forEach((btn) => {
+            if (btn === event.currentTarget) {
+              btn.classList.add("regive-selected");
+            } else {
+              btn.classList.remove("regive-selected");
+            }
+          });
+          this.setAmount(amount);
+        } else {
+          this.submitForm(amount);
+        }
       });
     });
     // Send banner height to parent
     this.sendHeightToParent();
-    this.sendMessageToParent("enabled");
+    if(digitalWalletsEnabled) {
+      // Amount button setup - if there is only one amount option, hide the amount buttons and just use that amount. If there are multiple amount options, show the buttons and select the first one as default.
+      if(amounts && amounts.length === 1) {
+        this.log("Only one amount option, hiding amount buttons", "⚠️");
+        const amountsWrapper = banner.querySelector(".regive-amounts") as HTMLElement;
+        if(amountsWrapper) {
+          amountsWrapper.style.display = "none";
+        }
+      } else {
+        this.log("Multiple amount options, showing amount buttons and selecting first as default", "🟢");
+        banner.querySelector(".regive-amount-btn")?.classList.add("regive-selected");
+      }
+      this.setAmount(amounts[0].trim());
+      const regiveWalletsWrapper = banner.querySelector(".regive-wallets-wrapper") as HTMLElement;
+      const digitalWalletsWrapper = document.querySelector(".digital-wallets-wrapper") as HTMLElement;
+      // Find if there are any iframes within .digital-wallets-wrapper, and if not, create a mutation observer to watch for them
+      if(!digitalWalletsWrapper && paymentMethod !== "card") {
+        this.log(`Original payment method was ${paymentMethod}, digital wallets form block was not found in the page.`, "🔴");
+        this.exit();
+        return;
+      }
+      if(digitalWalletsWrapper.querySelector("iframe") || (paymentMethod === "daf" && digitalWalletsWrapper.querySelector("#chariot-button"))) {
+        this.log("Digital wallets form block found in the page", "🟢");
+        regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
+        this.addDigitalWalletSubmitListeners(paymentMethod);
+        this.sendMessageToParent("enabled");
+      } else {
+        this.log("Digital wallets form block not found in the page, setting up mutation observer to watch for it", "⚠️");
+        const observer = new MutationObserver(() => {
+          const walletFrame = digitalWalletsWrapper.querySelector("iframe");
+          const chariotButton = paymentMethod === "daf" ? digitalWalletsWrapper.querySelector("#chariot-button") : null;
+          if (walletFrame || chariotButton) {
+            this.log("Digital wallets form block found in the page", "🟢");
+            clearTimeout(timer);
+            observer.disconnect();
+            regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
+            this.addDigitalWalletSubmitListeners(paymentMethod);
+            this.sendMessageToParent("enabled");
+          }
+        });
+        observer.observe(digitalWalletsWrapper, { childList: true, subtree: true });
+        const timer = setTimeout(() => {
+          observer.disconnect();
+          this.log("Digital wallets form block not found in the page after 5 seconds, exiting", "🔴");
+          this.exit();
+        }, 5000);
+      }
+    } else {
+      this.sendMessageToParent("enabled");
+    }
   }
 
-  private writeHiddenFields() {
+  private writeHiddenFields(paymentMethod: string) {
     const source = this.options?.source || "REGIVE";
-    const tokens = this.getVgsTokens();
     const sourceField = this.ENgrid.getField(
       "supporter.appealCode"
     ) as HTMLInputElement;
@@ -430,7 +517,33 @@ export class Regive {
       // Create the source field if it doesn't exist
       this.ENgrid.createHiddenInput("supporter.appealCode", source);
     }
+    this.setOneTimeFrequency();
+    // Uncheck the fee cover box if it exists
+    const feeCover = this.ENgrid.getField(
+      "transaction.feecover"
+    ) as HTMLInputElement;
+    if (feeCover && feeCover.checked) {
+      feeCover.checked = false;
+    }
+    const paymentTypeField = this.ENgrid.getField(
+      "transaction.paymenttype"
+    ) as HTMLInputElement;
+    if (paymentTypeField) {
+      paymentTypeField.value = paymentMethod;
+    }
+    const giveBySelect = (document.querySelector(`input[name='transaction.giveBySelect'][value='${paymentMethod}']`) as HTMLInputElement);
+    if(giveBySelect) {
+      this.log("Setting giveBySelect to match the payment method", "💾", { paymentMethod });
+      giveBySelect.checked = true;
+    }
+    if(paymentMethod == "card") {
+      this.writeHiddenCardFields();
+    }
+  }
 
+  private writeHiddenCardFields() {
+    const source = this.options?.source || "REGIVE";
+    const tokens = this.getVgsTokens();
     const expField = this.ENgrid.getField(
       "transaction.ccexpire"
     ) as HTMLInputElement;
@@ -496,16 +609,7 @@ export class Regive {
         tokens.card || ""
       );
     }
-    this.setOneTimeFrequency();
     this.ENgrid.setPaymentType("card");
-
-    // Uncheck the fee cover box if it exists
-    const feeCover = this.ENgrid.getField(
-      "transaction.feecover"
-    ) as HTMLInputElement;
-    if (feeCover && feeCover.checked) {
-      feeCover.checked = false;
-    }
 
     this.log("Writing hidden fields to the form", "💾", {
       source,
@@ -528,6 +632,11 @@ export class Regive {
     this.log("Form was not submitted via Regive", "🔴");
     return false;
   }
+  private detectPaymentMethod(): string {
+    const paymentType = localStorage.getItem("regive-paymenttype") || (this.hasVgsTokens() ? "card" : "digitalwallet-unknown");
+    this.log("Detected payment method", "💳", { paymentType });
+    return paymentType;
+  }
   private hasRequiredFields(): boolean {
     const requiredFields = document.querySelectorAll(
       ".en__mandatory:not(.en__hidden) input"
@@ -545,6 +654,11 @@ export class Regive {
         allFilled = false;
       }
     });
+    if (this.options?.test) {
+      this.log("Test mode enabled. Skipping required fields enforcement", "⚠️");
+      ENGrid.setFieldValue('supporter.emailAddress', 'testing@noaddress.ea')
+      return true;
+    }
     return allFilled;
   }
   private hasVgsTokens(): boolean {
@@ -598,6 +712,11 @@ export class Regive {
     return `${url}${separator}${params}`;
   }
 
+  private isOptionEnabled(value: string | null): boolean {
+    if (!value) return false;
+    return ["true", "1", "yes", "on"].includes(value.toLowerCase());
+  }
+
   private replaceRegiveTagWithIframe() {
     const regiveTags = document.querySelectorAll("regive");
     regiveTags.forEach((regiveTag) => {
@@ -609,8 +728,9 @@ export class Regive {
       const confetti = regiveTag.getAttribute("confetti") || "default";
       const bgColor = regiveTag.getAttribute("bg-color") || "#FFF";
       const txtColor = regiveTag.getAttribute("txt-color") || "#333";
-      const test = regiveTag.getAttribute("test") || "false";
+      const test = this.isOptionEnabled(regiveTag.getAttribute("test"));
       const basePage = regiveTag.getAttribute("base-page") || "";
+      const digitalWallets = this.isOptionEnabled(regiveTag.getAttribute("digital-wallets"));
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -685,8 +805,11 @@ export class Regive {
       regiveContainer.setAttribute("class", "regive-container");
       regiveContainer.dataset.thankYouMessage = thankYouMessage;
       regiveContainer.dataset.confetti = confetti;
-      if (test === "true") {
+      if (test) {
         regiveContainer.dataset.test = "true";
+      }
+      if (digitalWallets) {
+        regiveContainer.dataset.digitalWallets = "true";
       }
       regiveContainer.style.setProperty("--regive-bg-color", bgColor);
       regiveContainer.style.setProperty("--regive-txt-color", txtColor);
@@ -727,6 +850,7 @@ export class Regive {
     // Create mutation observer
     this._observer = new MutationObserver(() => {
       // Check all our target fields on any DOM change
+      saveFieldToStorage("transaction.paymenttype", "regive-paymenttype");
       saveFieldToStorage("transaction.ccnumber", "regive-num");
       saveFieldToStorage("transaction.ccvv", "regive-ver");
       saveFieldToStorage("transaction.ccexpire", "regive-exp");
@@ -846,8 +970,8 @@ export class Regive {
         );
         // Assign the value to the options object
         // Convert boolean string values to actual booleans
-        if (camelCaseKey === "test" || camelCaseKey === "confetti") {
-          if (value === "true") {
+        if (camelCaseKey === "test" || camelCaseKey === "confetti" || camelCaseKey === "digitalWallets") {
+          if (this.isOptionEnabled(value)) {
             (this.options as any)[camelCaseKey] = true;
           } else if (value === "false") {
             (this.options as any)[camelCaseKey] = false;
@@ -1008,16 +1132,35 @@ export class Regive {
       this.log("Not in an embedded iFrame. This is a Dev Mistake.", "🔴");
     }
   }
-  private setAmount(amount: number) {
+  private setAmount(amount: string) {
     // Run only if it is a Donation Page with a Donation Amount field
     if (!document.getElementsByName("transaction.donationAmt").length) {
       return;
+    }
+    const feeCover = this.ENgrid.getField(
+      "transaction.feeCover"
+    ) as HTMLInputElement;
+    if (feeCover && feeCover.checked) {
+      // I'll need a shower after this
+      const feeCoverAmount =
+        window.EngagingNetworks?.feeCover?.feeCover?.additionalAmount || 0;
+      const feeCoverPercent =
+        window.EngagingNetworks?.feeCover?.feeCover?.percent || 0;
+      const feeCoverType =
+        window.EngagingNetworks?.feeCover?.feeCover?.type || "PERCENT";
+      if (feeCoverType === "PERCENT") {
+        amount = (parseFloat(amount) / (1 + feeCoverPercent / 100)).toFixed(
+          2
+        );
+      } else if (feeCoverType === "AMOUNT") {
+        amount = (parseFloat(amount) - feeCoverAmount).toFixed(2);
+      }
     }
     // Search for the current amount on radio boxes
     let found = Array.from(
       document.querySelectorAll('input[name="transaction.donationAmt"]')
     ).filter(
-      (el) => el instanceof HTMLInputElement && parseInt(el.value) == amount
+      (el) => el instanceof HTMLInputElement && parseFloat(el.value) == parseFloat(amount)
     );
     // We found the amount on the radio boxes, so check it
     const otherField = document.querySelector(
@@ -1071,26 +1214,7 @@ export class Regive {
       // EN has a bug where the embedded form will FORCE the use of the feeCover if the parent donation form was set to cover fees
       // No matter what the user selects on the regive form
       // So we need to set the amount to a lower amount to consider the fees in case the user selected to cover fees
-      const feeCover = this.ENgrid.getField(
-        "transaction.feeCover"
-      ) as HTMLInputElement;
-      if (feeCover && feeCover.checked) {
-        // I'll need a shower after this
-        const feeCoverAmount =
-          window.EngagingNetworks?.feeCover?.feeCover?.additionalAmount || 0;
-        const feeCoverPercent =
-          window.EngagingNetworks?.feeCover?.feeCover?.percent || 0;
-        const feeCoverType =
-          window.EngagingNetworks?.feeCover?.feeCover?.type || "PERCENT";
-        if (feeCoverType === "PERCENT") {
-          amount = (parseFloat(amount) / (1 + feeCoverPercent / 100)).toFixed(
-            2
-          );
-        } else if (feeCoverType === "AMOUNT") {
-          amount = (parseFloat(amount) - feeCoverAmount).toFixed(2);
-        }
-      }
-      this.setAmount(parseFloat(amount));
+      this.setAmount(amount);
       localStorage.setItem(
         "regive-submitted",
         this.ENgrid.getPageID().toString()
@@ -1104,6 +1228,53 @@ export class Regive {
       form.submit();
     } else {
       this.log("Form not found. Cannot submit.", "🔴");
+    }
+  }
+  private addDigitalWalletSubmitListeners(paymentMethod: string) {
+    switch (paymentMethod) {
+      case "stripedigitalwallet":
+          window.EngagingNetworks?.require?._defined?.enStripeButtons?.stripeButtons?.paymentRequest?.on("paymentmethod", () => {
+            this.log("Clicked Stripe Digital Wallet Button", "💳");
+            localStorage.setItem(
+              "regive-submitted",
+              this.ENgrid.getPageID().toString()
+            );
+          });
+        break;
+      case "paypaltouch":
+      case "paypal-onetouch":
+      case "paypal-one-touch":
+      case "paypalonetouch":
+          const paypalTouch = window.EngagingNetworks?.require?._defined?.enPaypalTouch?.paypalTouch,
+            buttons = paypalTouch.library.Buttons.bind(paypalTouch.library);
+          paypalTouch.library.Buttons = (o: any) =>
+            buttons({
+              ...o,
+              onClick: (d: any, a: any) => {
+                this.log("Clicked PayPal Touch Button", "💳");
+                const v = this.ENgrid.getFieldValue("transaction.donationAmt");
+                const o2 = this.ENgrid.getFieldValue("transaction.donationAmt.other");
+                this.log("Current amount values before submission", "ℹ️", { amt: v, other: o2 });
+                localStorage.setItem(
+                  "regive-submitted",
+                  this.ENgrid.getPageID().toString()
+                );
+                o.onClick && o.onClick(d, a);
+              },
+            });
+          paypalTouch.unloadButton && paypalTouch.unloadButton();
+          paypalTouch.loadButton && paypalTouch.loadButton();
+        break;
+      case "daf":
+      case "dafpay":
+          document.getElementById("chariot-button")?.addEventListener("click", () => {
+            this.log("Clicked DAF Button", "💳");
+            localStorage.setItem(
+              "regive-submitted",
+              this.ENgrid.getPageID().toString()
+            );
+          });
+        break;
     }
   }
   private setOneTimeFrequency() {

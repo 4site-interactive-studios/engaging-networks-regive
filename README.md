@@ -105,6 +105,7 @@ Available themes:
 | ---------- | ----------------------------------------------- | --------------------------------------------------------------------- | ----------- |
 | `confetti` | Enable/disable confetti or set custom colors    | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"` |
 | `test`     | Enable test mode without actual form submission | `test="true"`                                                         | `false`     |
+| `digital-wallets` | Enable digital wallet payment methods | `digital-wallets="true"` | `false` |
 | `params`   | Additional URL parameters to pass to the iFrame | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`      |
 | `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
 
@@ -196,6 +197,24 @@ When test mode is enabled:
 - Testing the visual appearance
 - Ensuring the thank you message displays correctly
 - Satisfying your craving for confetti 🎉
+
+### Test different payment methods
+
+You can also specify a payment method to test using the `test-method` attribute. This allows you to simulate how the Regive component behaves with different payment methods (e.g., card, Apple Pay, Google Pay) without needing to go through the actual payment process. Test must be enabled to use this feature. **NOTE:** Methods other than `card` are unable to simulate the test celebration process, they will submit to the form with an actual transaction.
+
+```html
+<regive amount="5" test="true" test-method="stripedigitalwallets"></regive>
+```
+
+Accepted values for `test-method` include:
+- `card`
+- `applepay`
+- `googlepay`
+- `stripedigitalwallets`
+- `paypaltouch`
+- `daf`
+
+Keep in mind that the browser, configured gateways, and page builder settings you are using for testing must support the specified payment method in order to see the corresponding behavior in the Regive component.
 
 ## Debug Mode
 
@@ -334,7 +353,7 @@ Here's a more complex example with custom theming and test mode:
     <div class="kitten-regive-disclaimer">
       <p>
         By clicking the button above, you’ll quickly process a new donation to
-        your card!
+        your payment method!
       </p>
     </div>
   </div>
