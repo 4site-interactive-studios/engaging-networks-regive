@@ -58,7 +58,7 @@ export class Regive {
   // Create init function
   public static init() {
     const regive = new Regive();
-    if(!regive.isExited) {
+    if (!regive.isExited) {
       regive.log("Regive initialized");
     } else {
       regive.log("Regive initialization was exited", "🚪");
@@ -331,12 +331,11 @@ export class Regive {
               `
           <div class="regive-amounts">
             ${amounts
-              .map((amount, index) => {
-                return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
-                  labels[index]
-                }</button>`;
-              })
-              .join("")}
+                .map((amount, index) => {
+                  return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${labels[index]
+                    }</button>`;
+                })
+                .join("")}
           </div>
           `
             );
@@ -380,9 +379,8 @@ export class Regive {
       <div class="regive-amounts">
         ${amounts
           .map((amount, index) => {
-            return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
-              labels[index]
-            }</button>`;
+            return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${labels[index]
+              }</button>`;
           })
           .join("")}
       </div>
@@ -540,7 +538,7 @@ export class Regive {
     const requiredFields = document.querySelectorAll(".en__mandatory input") as NodeListOf<HTMLInputElement>;
     let allFilled = true;
     requiredFields.forEach((field) => {
-      if(field.id.includes("transaction") || field.name.includes("transaction") || field.classList.contains("en__field__input--other")) return;
+      if (field.id.includes("transaction") || field.name.includes("transaction") || field.classList.contains("en__field__input--other")) return;
       if (!field.value) {
         this.log("Required field is empty", "🔴", { field: field.name });
         allFilled = false;
@@ -593,7 +591,7 @@ export class Regive {
     localStorage.removeItem("regive-submitted");
     localStorage.removeItem("regive-height");
   }
-  
+
   private appendToUrl(url: string, params: string): string {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}${params}`;
@@ -618,6 +616,7 @@ export class Regive {
       const test = regiveTag.getAttribute("test") || "false";
       const basePage = regiveTag.getAttribute("base-page") || "";
       const lightbox = this.isOptionEnabled(regiveTag.getAttribute("lightbox"));
+      const lightboxWidth = regiveTag.getAttribute("lightbox-width") || false;
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -682,6 +681,9 @@ export class Regive {
       // Create the regive container
       const regiveContainer = document.createElement("div");
       regiveContainer.setAttribute("class", "regive-container");
+      if (lightbox) {
+        regiveContainer.classList.add("regive-lightbox-load");
+      }
       regiveContainer.dataset.thankYouMessage = thankYouMessage;
       regiveContainer.dataset.confetti = confetti;
       if (test === "true") {
@@ -702,13 +704,17 @@ export class Regive {
       // Replace the regive tag with our iframe
       regiveTag.replaceWith(regiveContainer);
 
-      if (lightbox) {      
+      if (lightbox) {
+        const lightboxOptions = lightboxWidth
+          ? { width: lightboxWidth }
+          : undefined;
         // Auto-open if conditions are met
         window.setTimeout(() => {
-          this.lightbox = new RegiveLightboxModal(this.log);
+          this.lightbox = new RegiveLightboxModal(this.log, lightboxOptions);
           console.log(this.isExited, "isExited value in timeout");
-          if(!this.isExited) {
+          if (!this.isExited) {
             this.log("Opening lightbox modal", "🟢");
+            regiveContainer.classList.remove("regive-lightbox-load");
             this.lightbox!.open();
           }
         }, 750);
@@ -946,14 +952,14 @@ export class Regive {
         case "loaded":
           iframeContainer.classList.add("regive-loaded");
           iframeContainer.classList.remove("regive-loading");
-          if(this.lightbox) {
+          if (this.lightbox) {
             this.lightbox.unlockExitIntent();
           }
           break;
         case "loading":
           iframeContainer.classList.add("regive-loading");
           iframeContainer.classList.remove("regive-loaded");
-          if(this.lightbox) {
+          if (this.lightbox) {
             this.lightbox.lockExitIntent();
           }
           break;
@@ -975,9 +981,9 @@ export class Regive {
           }
           this.isSuccessful = true;
           if (this.lightbox) {
-            setTimeout(()=>{
+            setTimeout(() => {
               this.lightbox?.close();
-            },3500);
+            }, 3500);
           }
           break;
         case "reset":
@@ -993,9 +999,6 @@ export class Regive {
             iframeContainer.style.height = data.value + "px";
             (iframe as HTMLIFrameElement).style.height = data.value + "px";
             (iframe as HTMLIFrameElement).style.width = "100%";
-            if(this.lightbox) {
-              this.lightbox.updatePlaceholderHeight(data.value);
-            }
             this.log("Iframe height set to", "📏", data.value);
           } else if (!this.isSuccessful) {
             this.log("Hiding iframe container", "🙈");
@@ -1052,23 +1055,23 @@ export class Regive {
     );
     // We found the amount on the radio boxes, so check it
     const otherField = document.querySelector(
-        'input[name="transaction.donationAmt.other"]'
-      ) as HTMLInputElement;
+      'input[name="transaction.donationAmt.other"]'
+    ) as HTMLInputElement;
     if (found.length) {
       const amountField = found[0] as HTMLInputElement;
       amountField.checked = true;
       // Other amount field value can be set to a previous value with chain links, so we need to clear it to avoid overlapping values
-      if(otherField) {
+      if (otherField) {
         otherField.value = "";
       }
     } else if (otherField) {
-        const enFieldOtherAmountRadio = document.querySelector(
-          `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
-        ) as HTMLInputElement;
-        if (enFieldOtherAmountRadio) {
-          enFieldOtherAmountRadio.checked = true;
-        }
-        otherField.value = parseFloat(amount.toString()).toFixed(2);
+      const enFieldOtherAmountRadio = document.querySelector(
+        `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
+      ) as HTMLInputElement;
+      if (enFieldOtherAmountRadio) {
+        enFieldOtherAmountRadio.checked = true;
+      }
+      otherField.value = parseFloat(amount.toString()).toFixed(2);
     } else {
       this.log("Could not find a way to set the amount field", "🔴");
     }

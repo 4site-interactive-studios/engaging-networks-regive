@@ -43,7 +43,10 @@ export interface RegiveOptions {
 
   /** Enable lightbox */
   lightbox?: boolean;
-  
+
+  /** Lightbox Width */
+  lightboxWidth?: string;
+
   /** Enable test mode without actual form submission */
   test?: boolean;
 }

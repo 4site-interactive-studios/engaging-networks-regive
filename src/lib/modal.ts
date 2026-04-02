@@ -3,13 +3,14 @@
  */
 import { ENGrid } from "./engrid";
 
-interface ModalOptions {
+export interface ModalOptions {
   onClickOutside?: "close" | "bounce";
   addCloseButton?: boolean;
   closeButtonLabel?: string;
   customClass?: string;
   showCloseX?: boolean;
   modalContent?: NodeListOf<Element> | HTMLElement | string;
+  width?: string;
 }
 
 export abstract class Modal {
@@ -21,6 +22,7 @@ export abstract class Modal {
     closeButtonLabel: "Okay!",
     customClass: "",
     showCloseX: true,
+    width: "450px",
   };
   private options: ModalOptions;
 
@@ -48,9 +50,8 @@ export abstract class Modal {
     this.modal.setAttribute("tabindex", "-1");
     this.modal.innerHTML = `
       <div class="regive-modal__overlay" tabindex="-1">
-        <div class="regive-modal__container" tabindex="0">
+        <div class="regive-modal__container" style="width: ${this.options.width};" tabindex="0">
           <div class="regive-modal__close regive-modal__close-x" role="button" tabindex="0" aria-label="Close">
-            X
           </div>
           <div class="regive-modal__body"></div>
         </div>

@@ -2,16 +2,15 @@
  * Regive Lightbox Modal
  * Extends the base Modal class to provide a lightbox experience for Regive
  */
-import { Modal } from "./modal";
+import { Modal, ModalOptions } from "./modal";
 export class RegiveLightboxModal extends Modal {
   private log?: (message: string, emoji?: string, data?: any) => void;
-  constructor(logger?: (message: string, emoji?: string, data?: any) => void) {
+  constructor(logger?: (message: string, emoji?: string, data?: any) => void, options: ModalOptions = {}) {
     super({
       customClass: "regive-lightbox-modal",
       onClickOutside: "close",
-      addCloseButton: true,
-      closeButtonLabel: "Dismiss",
       modalContent: RegiveLightboxModal.getModalContent(),
+      ...options,
     });
     this.log = logger;
   }
@@ -22,24 +21,8 @@ export class RegiveLightboxModal extends Modal {
   }
 
   public close(): void {
-    // Move the regive container back to its original position in the DOM
-    const originalContent = this.modalContent instanceof HTMLElement && this.modalContent.querySelector(".regive-container");
-    if (originalContent) {
-      const placeholder = document.querySelector(".regive-placeholder");
-      this.log?.("Closing Regive Lightbox Modal. Moving original content back to page.", "🟢", { originalContent, placeholder });
-      if (placeholder) {
-        placeholder.replaceWith(originalContent);
-      }
-    }
+    this.log?.("Closing Regive Lightbox Modal", "🔴");
     super.close();
-  }
-
-  public updatePlaceholderHeight(height: number): void {
-    const placeholder = document.querySelector(".regive-placeholder") as HTMLElement;
-    if (placeholder) {
-      placeholder.style.height = `${height}px`;
-      this.log?.("Updated placeholder height.", "🟢", { height: placeholder.style.height });
-    }
   }
 
   public static getModalContent(): HTMLElement {
@@ -48,12 +31,7 @@ export class RegiveLightboxModal extends Modal {
 
     // Get the element ".regive-container" and move it inside the modal content
     const regiveContainer = document.querySelector(".regive-container") as HTMLElement;
-    const placeholder = document.createElement("div");
-    placeholder.setAttribute("class", "regive-placeholder");
-    placeholder.style.height = regiveContainer ? `${regiveContainer.offsetHeight}px` : "0px";
-    placeholder.style.width = regiveContainer ? `${regiveContainer.offsetWidth}px` : "0px";
     if (regiveContainer) {
-      regiveContainer.insertAdjacentElement("beforebegin", placeholder);
       modalContent.appendChild(regiveContainer);
     }
     return modalContent;

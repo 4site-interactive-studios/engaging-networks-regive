@@ -101,13 +101,14 @@ Available themes:
 
 ### Advanced Options
 
-| Option     | Description                                     | Example                                                               | Default     |
-| ---------- | ----------------------------------------------- | --------------------------------------------------------------------- | ----------- |
-| `confetti` | Enable/disable confetti or set custom colors    | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"` |
-| `test`     | Enable test mode without actual form submission | `test="true"`                                                         | `false`     |
-| `lightbox` | Render Regive inside a modal opened by a trigger button | `lightbox="true" lightbox-label="Make another gift"`                 | `false`     |
-| `params`   | Additional URL parameters to pass to the iFrame | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`      |
-| `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
+| Option           | Description                                                       | Example                                                               | Default                        |
+| ---------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------ |
+| `confetti`       | Enable/disable confetti or set custom colors                      | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"`                    |
+| `test`           | Enable test mode without actual form submission                   | `test="true"`                                                         | `false`                        |
+| `lightbox`       | Render Regive inside a modal opened by a trigger button           | `lightbox="true" lightbox-label="Make another gift"`                  | `false`                        |
+| `lightbox-width` | Set custom width for the lightbox modal (max-width is always 90%) | `lightbox-width="600px"`                                              | `450px`                        |
+| `params`         | Additional URL parameters to pass to the iFrame                   | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`                         |
+| `base-page`      | EN page ID to process the donation through                        | `base-page="12345"`                                                   | Same as original donation page |
 
 #### Base Page Option
 

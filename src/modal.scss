@@ -1,6 +1,7 @@
 [data-engrid-has-lightbox] {
   overflow: hidden;
 }
+
 #enModal {
   position: fixed;
   top: 0;
@@ -20,7 +21,8 @@
 
   &.is-hidden {
     top: -500vh;
-    transition: none; /* When the modal gains the "is-hidden" class it will dissapear instantly */
+    transition: none;
+    /* When the modal gains the "is-hidden" class it will dissapear instantly */
   }
 
   &.image-right {
@@ -91,8 +93,7 @@
 }
 
 .regive-modal__container {
-  max-width: 700px;
-  width: 100%;
+  max-width: 90%;
   position: relative;
   background-color: #ffffff;
   padding: 0;
@@ -104,8 +105,22 @@
   }
 }
 
-.regive-modal:not(.regive-modal--close-x) .regive-modal__close-x, .regive-modal.regive-modal--no-exit-intent .regive-modal__close-x {
+.regive-modal:not(.regive-modal--close-x) .regive-modal__close-x,
+.regive-modal.regive-modal--no-exit-intent .regive-modal__close-x {
   display: none;
+}
+
+.regive-modal__close-x::after {
+  content: "\2715";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  color: rgba(0, 0, 0, 0.75);
+  transition: all 0.3s ease;
+}
+
+.regive-modal__close-x:hover::after {
+  color: red;
 }
 
 .regive-modal__close {
@@ -114,15 +129,18 @@
   top: 8px;
   cursor: pointer;
   font-size: 20px;
-  z-index: 1;
-  background: rgba(255,255,255,.5);
+  z-index: 1001;
+  background: rgba(255, 255, 255, .5);
   padding: 0px 8px;
+  width: 30px;
+  height: 30px;
   border-radius: 100%;
+  transition: all 0.3s ease;
 }
 
 .regive-modal__close:hover {
-  background: rgba(255,255,255,.8);
-  color: red;
+  background: rgba(255, 255, 255, .8);
+  transform: scale(1.1);
 }
 
 .regive-modal__body {
@@ -152,9 +170,11 @@
   0% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.02);
   }
+
   100% {
     transform: scale(1);
   }
@@ -167,6 +187,7 @@
 
 .regive-placeholder {
   background: rgba(0, 0, 0, 0.15);
+
   &::after {
     content: "";
     position: absolute;
