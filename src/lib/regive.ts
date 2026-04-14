@@ -116,7 +116,7 @@ export class Regive {
         this.exit();
         return;
       }
-      if (this.hasVgsTokens() && this.hasRequiredFields() && this.isChained) {
+      if (this.hasVgsTokens() && this.isChained) {
         this.log(
           "Conditions met to hide the donation form and add a banner",
           "🟢"
@@ -535,10 +535,17 @@ export class Regive {
       this.log("Test mode enabled. Skipping required fields check", "⚠️");
       return true;
     }
-    const requiredFields = document.querySelectorAll(".en__mandatory input") as NodeListOf<HTMLInputElement>;
+    const requiredFields = document.querySelectorAll(
+      ".en__mandatory:not(.en__hidden) input"
+    ) as NodeListOf<HTMLInputElement>;
     let allFilled = true;
     requiredFields.forEach((field) => {
-      if (field.id.includes("transaction") || field.name.includes("transaction") || field.classList.contains("en__field__input--other")) return;
+      if (
+        field.id.includes("transaction") ||
+        field.name.includes("transaction") ||
+        field.classList.contains("en__field__input--other")
+      )
+        return;
       if (!field.value) {
         this.log("Required field is empty", "🔴", { field: field.name });
         allFilled = false;
@@ -634,16 +641,24 @@ export class Regive {
         iframeSrc = currentUrl.toString();
       } else {
         // Replace the current page with /1 from the end of the URL
-        const fallbackPagePathRegex = new RegExp(`/page/(\\d+)/([a-zA-Z]+)/${this.ENgrid.getPageNumber()}`);
+        const fallbackPagePathRegex = new RegExp(
+          `/page/(\\d+)/([a-zA-Z]+)/${this.ENgrid.getPageNumber()}`
+        );
         iframeSrc = iframeSrc.replace(fallbackPagePathRegex, "/page/$1/$2/1");
       }
 
       // Add chain parameter if not already present
-      if (!/[?&]chain($|&)/.test(iframeSrc) && !/^chain($|&)/.test(optionsStr)) {
+      if (
+        !/[?&]chain($|&)/.test(iframeSrc) &&
+        !/^chain($|&)/.test(optionsStr)
+      ) {
         iframeSrc = this.appendToUrl(iframeSrc, "chain");
         this.log("Added chain parameter", "ℹ️");
       } else {
-        this.log("IFrame Source already has chain parameter, skipping addition", "ℹ️");
+        this.log(
+          "IFrame Source already has chain parameter, skipping addition",
+          "ℹ️"
+        );
       }
 
       // Append additional options if provided
@@ -1079,6 +1094,14 @@ export class Regive {
   private submitForm(amount: string) {
     this.log("Submitting form with amount", "💰", { amount });
     this.sendMessageToParent("loading");
+    if (!this.hasRequiredFields()) {
+      this.log(
+        "Not submitting form because required fields are not filled",
+        "🔴"
+      );
+      this.exit();
+      return;
+    }
     if (this.options?.test) {
       this.log("Test mode enabled. Not submitting the form.", "⚠️");
       window.setTimeout(() => {
