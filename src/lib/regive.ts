@@ -726,7 +726,7 @@ export class Regive {
         // Auto-open if conditions are met
         window.setTimeout(() => {
           this.lightbox = new RegiveLightboxModal(this.log, lightboxOptions);
-          console.log(this.isExited, "isExited value in timeout");
+          this.log(`isExited value in timeout: ${this.isExited}`, "ℹ️");
           if (!this.isExited) {
             this.log("Opening lightbox modal", "🟢");
             regiveContainer.classList.remove("regive-lightbox-load");
@@ -734,7 +734,6 @@ export class Regive {
           }
         }, 750);
       }
-      // Replace the regive tag with our iframe
     });
   }
 

@@ -2,62 +2,6 @@
   overflow: hidden;
 }
 
-#enModal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  z-index: 2147483645;
-  background-color: rgba(0, 0, 0, 0.85);
-  width: 100vw;
-  height: 100%;
-  -webkit-transition: top 0.4s ease-in-out;
-  transition: top 0.4s ease-in-out;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow-y: scroll; // Scroll vertically (used when modal contents are larger than the viewport)
-  overflow-x: hidden; // Do not scroll horizontally
-
-  &.is-hidden {
-    top: -500vh;
-    transition: none;
-    /* When the modal gains the "is-hidden" class it will dissapear instantly */
-  }
-
-  &.image-right {
-    #goMonthly {
-      grid-template-columns: 1fr minmax(0, 480px) !important;
-    }
-
-    .background {
-      grid-column: 2;
-      grid-row: 1;
-    }
-
-    .upsellLightboxContent {
-      grid-column: 1;
-      grid-row: 1;
-    }
-  }
-
-  &.is-submitting {
-    .loader-wrapper {
-      visibility: visible !important;
-    }
-
-    span.label {
-      visibility: hidden;
-    }
-
-    #upsellYesButton a,
-    #upsellNoButton button {
-      background-color: #ccc;
-      border-color: #ccc;
-    }
-  }
-}
-
 // generic modal styles
 .regive-modal {
   position: fixed;
@@ -110,17 +54,43 @@
   display: none;
 }
 
-.regive-modal__close-x::after {
-  content: "\2715";
+.regive-modal__close-x {
   position: absolute;
-  width: 20px;
-  height: 20px;
-  color: rgba(0, 0, 0, 0.75);
-  transition: all 0.3s ease;
-}
+  width: 30px;
+  /* Match the circular button size */
+  height: 30px;
+  top: 8px;
+  right: 15px;
+  cursor: pointer;
+  z-index: 1001;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 
-.regive-modal__close-x:hover::after {
-  color: red;
+  &:before,
+  &:after {
+    content: '';
+    width: 20px;
+    /* Adjusted to fit within the button */
+    height: 2px;
+    background-color: black;
+    position: absolute;
+    transform-origin: center;
+    transition: all 0.3s ease;
+  }
+
+  &:before {
+    transform: rotate(45deg);
+  }
+
+  &:after {
+    transform: rotate(-45deg);
+  }
+
+  &:hover:before,
+  &:hover:after {
+    background-color: red;
+  }
 }
 
 .regive-modal__close {

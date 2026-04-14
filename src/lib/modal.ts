@@ -14,7 +14,7 @@ export interface ModalOptions {
 }
 
 export abstract class Modal {
-  public modalContent: NodeListOf<Element> | HTMLElement | String;
+  public modalContent: NodeListOf<Element> | HTMLElement | string;
   public modal: HTMLDivElement | null = null;
   private defaultOptions: ModalOptions = {
     onClickOutside: "close",
@@ -179,7 +179,7 @@ export abstract class Modal {
     this.modal?.removeEventListener("keydown", this.focusTrapHandler);
   }
 
-  public getModalContent(): NodeListOf<Element> | HTMLElement | String {
+  public getModalContent(): NodeListOf<Element> | HTMLElement | string {
     return "<h1>Default Modal Content</h1>";
   }
 }
