@@ -41,6 +41,12 @@ export interface RegiveOptions {
   /** Base page ID to process the donation through */
   basePage?: string;
 
+  /** Enable lightbox */
+  lightbox?: boolean;
+
+  /** Lightbox Width */
+  lightboxWidth?: string;
+
   /** Enable test mode without actual form submission */
   test?: boolean;
 }

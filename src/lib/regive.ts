@@ -1,5 +1,6 @@
 import { ENGrid } from "./engrid";
 import { RegiveOptions } from "./regive-options";
+import { RegiveLightboxModal } from "./regive-lightbox";
 import "./confetti";
 
 export class Regive {
@@ -10,7 +11,10 @@ export class Regive {
   private readonly isEmbedded: boolean = window !== window.parent;
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
   private isExited: boolean = false;
+  private isSuccessful: boolean = false;
   private iFrameId: string | null = null;
+  private lightbox: RegiveLightboxModal | null = null;
+
 
   private readonly themes = [
     "button-right",
@@ -327,12 +331,11 @@ export class Regive {
               `
           <div class="regive-amounts">
             ${amounts
-              .map((amount, index) => {
-                return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
-                  labels[index]
-                }</button>`;
-              })
-              .join("")}
+                .map((amount, index) => {
+                  return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${labels[index]
+                    }</button>`;
+                })
+                .join("")}
           </div>
           `
             );
@@ -376,9 +379,8 @@ export class Regive {
       <div class="regive-amounts">
         ${amounts
           .map((amount, index) => {
-            return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
-              labels[index]
-            }</button>`;
+            return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${labels[index]
+              }</button>`;
           })
           .join("")}
       </div>
@@ -529,6 +531,10 @@ export class Regive {
     return false;
   }
   private hasRequiredFields(): boolean {
+    if (this.options?.test) {
+      this.log("Test mode enabled. Skipping required fields check", "⚠️");
+      return true;
+    }
     const requiredFields = document.querySelectorAll(
       ".en__mandatory:not(.en__hidden) input"
     ) as NodeListOf<HTMLInputElement>;
@@ -598,6 +604,11 @@ export class Regive {
     return `${url}${separator}${params}`;
   }
 
+  private isOptionEnabled(value: string | null): boolean {
+    if (!value) return false;
+    return ["true", "1", "yes", "on"].includes(value.toLowerCase());
+  }
+
   private replaceRegiveTagWithIframe() {
     const regiveTags = document.querySelectorAll("regive");
     regiveTags.forEach((regiveTag) => {
@@ -611,6 +622,8 @@ export class Regive {
       const txtColor = regiveTag.getAttribute("txt-color") || "#333";
       const test = regiveTag.getAttribute("test") || "false";
       const basePage = regiveTag.getAttribute("base-page") || "";
+      const lightbox = this.isOptionEnabled(regiveTag.getAttribute("lightbox"));
+      const lightboxWidth = regiveTag.getAttribute("lightbox-width") || false;
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -683,6 +696,9 @@ export class Regive {
       // Create the regive container
       const regiveContainer = document.createElement("div");
       regiveContainer.setAttribute("class", "regive-container");
+      if (lightbox) {
+        regiveContainer.classList.add("regive-lightbox-load");
+      }
       regiveContainer.dataset.thankYouMessage = thankYouMessage;
       regiveContainer.dataset.confetti = confetti;
       if (test === "true") {
@@ -702,6 +718,22 @@ export class Regive {
 
       // Replace the regive tag with our iframe
       regiveTag.replaceWith(regiveContainer);
+
+      if (lightbox) {
+        const lightboxOptions = lightboxWidth
+          ? { width: lightboxWidth }
+          : undefined;
+        // Auto-open if conditions are met
+        window.setTimeout(() => {
+          this.lightbox = new RegiveLightboxModal(this.log, lightboxOptions);
+          this.log(`isExited value in timeout: ${this.isExited}`, "ℹ️");
+          if (!this.isExited) {
+            this.log("Opening lightbox modal", "🟢");
+            regiveContainer.classList.remove("regive-lightbox-load");
+            this.lightbox!.open();
+          }
+        }, 750);
+      }
     });
   }
 
@@ -934,10 +966,16 @@ export class Regive {
         case "loaded":
           iframeContainer.classList.add("regive-loaded");
           iframeContainer.classList.remove("regive-loading");
+          if (this.lightbox) {
+            this.lightbox.unlockExitIntent();
+          }
           break;
         case "loading":
           iframeContainer.classList.add("regive-loading");
           iframeContainer.classList.remove("regive-loaded");
+          if (this.lightbox) {
+            this.lightbox.lockExitIntent();
+          }
           break;
         case "celebrate":
           this.celebrate(
@@ -955,6 +993,12 @@ export class Regive {
           if (iframeContainer.dataset.test !== "true") {
             this.clearVgsTokens();
           }
+          this.isSuccessful = true;
+          if (this.lightbox) {
+            setTimeout(() => {
+              this.lightbox?.close();
+            }, 3500);
+          }
           break;
         case "reset":
           const iframeContainerParentReset =
@@ -970,7 +1014,7 @@ export class Regive {
             (iframe as HTMLIFrameElement).style.height = data.value + "px";
             (iframe as HTMLIFrameElement).style.width = "100%";
             this.log("Iframe height set to", "📏", data.value);
-          } else {
+          } else if (!this.isSuccessful) {
             this.log("Hiding iframe container", "🙈");
             iframeContainer.style.display = "none";
           }
@@ -983,6 +1027,10 @@ export class Regive {
           }
           this.log("Child iframe requested exit", "🚪");
           this.ENgrid.setBodyData("enabled", "false");
+
+          if (this.lightbox) {
+            this.lightbox.close();
+          }
           iframeContainer.remove();
           break;
         default:
