@@ -9,8 +9,8 @@ body[data-regive-embedded="true"] {
   form.en__component {
     display: none;
   }
-  iframe {
-    display: none;
+  iframe:not([src*="recaptcha"]) {
+    display: unset;
   }
   .regive-test {
     &::after {
@@ -75,6 +75,10 @@ body[data-regive-embedded="true"] {
   }
   .regive-amount {
     font-weight: bold;
+  }
+  .g-recaptcha {
+    display: flex;
+    justify-content: center;
   }
 }
 .regive-container {
