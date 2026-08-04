@@ -118,7 +118,7 @@ By default, Regive processes the additional donation through the same page as th
 
 You can create custom themes by:
 
-1. Creating a template element with an ID that will be used as the theme name. **Important:** This template must be added to **Page 1 of your Engaging Networks Donation Page**, as it will be used when the donor starts the regive donation process.
+1. Creating a template element with an ID that will be used as the theme name. **Important:** This template must be added to **Page 1 of your Engaging Networks Donation Page**, as it will be used when the donor starts the regive donation process. For pages that use Captcha, the template must include an area for the captcha to be rendered. Here's an example of a custom theme template:
 
    ```html
    <template id="my-custom-theme">
@@ -144,6 +144,7 @@ You can create custom themes by:
      </style>
      <div class="my-custom-theme">
        {{heading}}
+       <div class="regive-captcha-container"></div>
        <div class="my-custom-buttons">{{button}}</div>
      </div>
    </template>
@@ -330,6 +331,7 @@ Here's a more complex example with custom theming and test mode:
       gift today, you can symbolically adopt a kitten and help us provide
       shelter, food, and care for these adorable animals.
     </p>
+    <div class="regive-captcha-container"></div>
     {{button}}
     <div class="kitten-regive-disclaimer">
       <p>

@@ -10,6 +10,7 @@ export class Regive {
   private readonly isEmbedded: boolean = window !== window.parent;
   private readonly isChained: boolean = !!this.ENgrid.getUrlParameter("chain");
   private isExited: boolean = false;
+  private isCaptchaUnlocked: boolean = false;
   private iFrameId: string | null = null;
 
   private readonly themes = [
@@ -27,12 +28,6 @@ export class Regive {
       this.debugMode = regiveScriptSrc.includes("debug");
     }
     this.log("Initializing Regive class");
-
-    if (this.hasCaptcha()) {
-      this.log("Page has a CAPTCHA. Regive will not run.", "⚠️");
-      this.exit();
-      return;
-    }
 
     if (!this.isDonationPage()) {
       this.log("Not a donation page. Regive will not run.", "⚠️");
@@ -262,6 +257,8 @@ export class Regive {
 
     const currencySymbol = this.ENgrid.getCurrencySymbol();
 
+    const hasCaptcha = this.hasCaptcha();
+
     const amounts = this.options?.amount?.split(",") || ["5"];
     const labels: string[] = [];
     const bgColor = this.options?.bgColor || "#FFF";
@@ -305,7 +302,7 @@ export class Regive {
         color: var(--regive-button-txt-color);
         border: 1px solid var(--regive-button-bg-color);
       }
-      .regive-amount-btn:hover {
+      .regive-amount-btn:hover:not(:disabled) {
         background-color: var(--regive-button-txt-color);
         color: var(--regive-button-bg-color);
         border-color: var(--regive-button-bg-color);
@@ -327,12 +324,11 @@ export class Regive {
               `
           <div class="regive-amounts">
             ${amounts
-              .map((amount, index) => {
-                return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
-                  labels[index]
-                }</button>`;
-              })
-              .join("")}
+                .map((amount, index) => {
+                  return `<button class="regive-amount-btn" data-amount="${amount.trim()}" ${hasCaptcha ? "disabled" : ""}>${labels[index]
+                    }</button>`;
+                })
+                .join("")}
           </div>
           `
             );
@@ -373,12 +369,12 @@ export class Regive {
     ${templateCSS}
     <div class="regive-banner" data-theme="${theme}">
       ${heading ? `<h1 class="regive-heading">${heading}</h1>` : ""}
+      ${hasCaptcha ? `<div class="regive-captcha-container"></div>` : ""}
       <div class="regive-amounts">
         ${amounts
           .map((amount, index) => {
-            return `<button class="regive-amount-btn" data-amount="${amount.trim()}">${
-              labels[index]
-            }</button>`;
+            return `<button class="regive-amount-btn" data-amount="${amount.trim()}" ${hasCaptcha ? "disabled" : ""}>${labels[index]
+              }</button>`;
           })
           .join("")}
       </div>
@@ -415,7 +411,98 @@ export class Regive {
     });
     // Send banner height to parent
     this.sendHeightToParent();
+    if (hasCaptcha) {
+      // Teleport '.en__captcha' to '.regive-captcha-container'
+      const captchaContainer = banner.querySelector(".regive-captcha-container") as HTMLDivElement | null;
+      if (!captchaContainer) {
+        this.log('CAPTCHA detected but the theme has no captcha container. Custom themes must include <div class="regive-captcha-container"></div>. Regive will not run.', "🔴");
+        this.exit();
+        return;
+      }
+      const captcha = document.querySelector(".en__captcha") as HTMLElement | null;
+      if (captcha) {
+        this.log("CAPTCHA found in the page, teleporting it to the banner", "🟢");
+        captchaContainer.appendChild(captcha);
+        this.overrideCaptchaCallbacks(captcha);
+        this.sendHeightToParent();
+      } else {
+        this.log("CAPTCHA not found in the page, setting up mutation observer to watch for it", "⚠️");
+        const observer = new MutationObserver(() => {
+          const captchaElement = document.querySelector(".en__captcha") as HTMLElement | null;
+          if (captchaElement) {
+            this.log("CAPTCHA found in the page, teleporting it to the banner", "🟢");
+            clearTimeout(timer);
+            observer.disconnect();
+            captchaContainer.appendChild(captchaElement);
+            this.overrideCaptchaCallbacks(captchaElement);
+            this.sendHeightToParent();
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        const timer = setTimeout(() => {
+          observer.disconnect();
+          this.log("CAPTCHA not found in the page after 5 seconds, exiting", "🔴");
+          this.exit();
+        }, 5000);
+      }
+    }
     this.sendMessageToParent("enabled");
+  }
+
+  private unlockButtons() {
+    this.log("Unlocking amount buttons", "🟢");
+    const buttons = document.querySelectorAll(".regive-amount-btn");
+    buttons.forEach((button) => {
+      (button as HTMLButtonElement).disabled = false;
+    });
+  }
+
+  private lockButtons() {
+    this.log("Locking amount buttons", "🔒");
+    const buttons = document.querySelectorAll(".regive-amount-btn");
+    buttons.forEach((button) => {
+      (button as HTMLButtonElement).disabled = true;
+    });
+  }
+
+  private overrideCaptchaCallbacks(captcha: HTMLElement) {
+    // Get the g-recaptcha element inside the captcha container
+    const recaptcha = captcha.querySelector(".g-recaptcha") as HTMLElement | null;
+    if (!recaptcha) {
+      this.log("g-recaptcha element not found inside the captcha container. aborting", "🔴")
+      this.exit();
+      return;
+    }
+    // Override data-callback and data-expired-callback attributes
+    // This relies on reCAPTCHA resolving the callback name on window at
+    // invocation time (verified with reCAPTCHA v2). If the widget re-renders
+    // (e.g. EN step reloads), the override must be re-applied.
+    const globalWindow = window as Record<string, any>;
+    const originalCallback = recaptcha.getAttribute("data-callback");
+    const originalExpiredCallback = recaptcha.getAttribute("data-expired-callback");
+    if (!originalCallback || typeof globalWindow[originalCallback] !== 'function') {
+      this.log(`g-recaptcha data-callback "${originalCallback}" is missing or not a global function. Amount buttons would never unlock, aborting.`, "🔴");
+      this.exit();
+      return;
+    }
+    // Run our handle Captcha function first, then call the original callback
+    const original = globalWindow[originalCallback] as (token: string) => void;
+    globalWindow[originalCallback] = (token: string) => {
+      this.unlockButtons();
+      this.isCaptchaUnlocked = true;
+      original(token);
+    };
+    if (originalExpiredCallback && typeof globalWindow[originalExpiredCallback] === 'function') {
+      // Run our handle Captcha expired function first, then call the original expired callback
+      const originalExpired = globalWindow[originalExpiredCallback] as () => void;
+      globalWindow[originalExpiredCallback] = () => {
+        this.lockButtons();
+        this.isCaptchaUnlocked = false;
+        originalExpired();
+      };
+    } else {
+      this.log(`g-recaptcha data-expired-callback "${originalExpiredCallback}" is missing or not a global function. Buttons will not re-lock on token expiry.`, "⚠️");
+    }
   }
 
   private writeHiddenFields() {
@@ -1045,7 +1132,11 @@ export class Regive {
   private submitForm(amount: string) {
     this.log("Submitting form with amount", "💰", { amount });
     this.sendMessageToParent("loading");
-    if (!this.hasRequiredFields()) {
+    if (this.hasCaptcha() && !this.isCaptchaUnlocked) {
+      this.log("Not submitting form because CAPTCHA is not unlocked", "🔴");
+      this.sendMessageToParent("loaded");
+      return;
+    } if (!this.hasRequiredFields()) {
       this.log(
         "Not submitting form because required fields are not filled",
         "🔴"
