@@ -413,9 +413,14 @@ export class Regive {
     this.sendHeightToParent();
     if (hasCaptcha) {
       // Teleport '.en__captcha' to '.regive-captcha-container'
-      const captchaContainer = banner.querySelector(".regive-captcha-container") as HTMLDivElement;
+      const captchaContainer = banner.querySelector(".regive-captcha-container") as HTMLDivElement | null;
+      if (!captchaContainer) {
+        this.log('CAPTCHA detected but the theme has no captcha container. Custom themes must include <div class="regive-captcha-container"></div>. Regive will not run.', "🔴");
+        this.exit();
+        return;
+      }
       const captcha = document.querySelector(".en__captcha") as HTMLElement | null;
-      if (captcha && captchaContainer) {
+      if (captcha) {
         this.log("CAPTCHA found in the page, teleporting it to the banner", "🟢");
         captchaContainer.appendChild(captcha);
         this.overrideCaptchaCallbacks(captcha);
@@ -424,7 +429,7 @@ export class Regive {
         this.log("CAPTCHA not found in the page, setting up mutation observer to watch for it", "⚠️");
         const observer = new MutationObserver(() => {
           const captchaElement = document.querySelector(".en__captcha") as HTMLElement | null;
-          if (captchaElement && captchaContainer) {
+          if (captchaElement) {
             this.log("CAPTCHA found in the page, teleporting it to the banner", "🟢");
             clearTimeout(timer);
             observer.disconnect();
@@ -469,19 +474,24 @@ export class Regive {
       return;
     }
     // Override data-callback and data-expired-callback attributes
-    // Get the original callbacks
+    // This relies on reCAPTCHA resolving the callback name on window at
+    // invocation time (verified with reCAPTCHA v2). If the widget re-renders
+    // (e.g. EN step reloads), the override must be re-applied.
     const globalWindow = window as Record<string, any>;
     const originalCallback = recaptcha.getAttribute("data-callback");
     const originalExpiredCallback = recaptcha.getAttribute("data-expired-callback");
-    if (originalCallback && typeof globalWindow[originalCallback] === 'function') {
-      // Run our handle Captcha function first, then call the original callback
-      const original = globalWindow[originalCallback] as (token: string) => void;
-      globalWindow[originalCallback] = (token: string) => {
-        this.unlockButtons();
-        this.isCaptchaUnlocked = true;
-        original(token);
-      };
+    if (!originalCallback || typeof globalWindow[originalCallback] !== 'function') {
+      this.log(`g-recaptcha data-callback "${originalCallback}" is missing or not a global function. Amount buttons would never unlock, aborting.`, "🔴");
+      this.exit();
+      return;
     }
+    // Run our handle Captcha function first, then call the original callback
+    const original = globalWindow[originalCallback] as (token: string) => void;
+    globalWindow[originalCallback] = (token: string) => {
+      this.unlockButtons();
+      this.isCaptchaUnlocked = true;
+      original(token);
+    };
     if (originalExpiredCallback && typeof globalWindow[originalExpiredCallback] === 'function') {
       // Run our handle Captcha expired function first, then call the original expired callback
       const originalExpired = globalWindow[originalExpiredCallback] as () => void;
@@ -490,6 +500,8 @@ export class Regive {
         this.isCaptchaUnlocked = false;
         originalExpired();
       };
+    } else {
+      this.log(`g-recaptcha data-expired-callback "${originalExpiredCallback}" is missing or not a global function. Buttons will not re-lock on token expiry.`, "⚠️");
     }
   }
 

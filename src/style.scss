@@ -10,7 +10,7 @@ body[data-regive-embedded="true"] {
     display: none;
   }
   iframe:not([src*="recaptcha"]) {
-    display: unset;
+    display: none;
   }
   .regive-test {
     &::after {
