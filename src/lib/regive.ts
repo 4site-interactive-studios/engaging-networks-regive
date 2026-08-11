@@ -2,7 +2,7 @@ import { ENGrid } from "./engrid";
 import { RegiveOptions } from "./regive-options";
 import "./confetti";
 
-const digitalWalletMethods = ["applepay","googlepay","stripedigitalwallet"]; // currently unsupported: "paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch", "daf"
+const digitalWalletMethods = ["applepay", "googlepay", "stripedigitalwallet"]; // currently unsupported: "paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch", "daf"
 
 export class Regive {
   private readonly ENgrid = ENGrid;
@@ -109,9 +109,18 @@ export class Regive {
         this.exit();
         return;
       }
-      const paymentMethod = (this.options?.test && this.options?.testMethod) ? this.options?.testMethod : this.detectPaymentMethod();
+      const paymentMethod =
+        this.options?.test && this.options?.testMethod
+          ? this.options?.testMethod
+          : this.detectPaymentMethod();
       this.log("Detected payment method", "💳", paymentMethod);
-      if (((digitalWalletMethods.includes(paymentMethod) && this.options?.digitalWallets) || paymentMethod == "card") && this.hasRequiredFields() && this.isChained) {
+      if (
+        ((digitalWalletMethods.includes(paymentMethod) &&
+          this.options?.digitalWallets) ||
+          paymentMethod == "card") &&
+        this.hasRequiredFields() &&
+        this.isChained
+      ) {
         this.log(
           "Conditions met to hide the donation form and add a banner",
           "🟢"
@@ -271,7 +280,9 @@ export class Regive {
     const buttonTxtColor = this.options?.buttonTxtColor || "#FFF";
     const buttonLabel = this.options?.buttonLabel || "Add {{amount}}";
     const buttonLabelRegex = new RegExp("{{amount}}", "g");
-    const digitalWalletsEnabled = this.options?.digitalWallets && digitalWalletMethods.includes(paymentMethod);
+    const digitalWalletsEnabled =
+      this.options?.digitalWallets &&
+      digitalWalletMethods.includes(paymentMethod);
     amounts.forEach((amount) => {
       const label = buttonLabel.replace(
         buttonLabelRegex,
@@ -303,7 +314,9 @@ export class Regive {
       .regive-heading {
         color: var(--regive-txt-color);
       }
-      ${digitalWalletsEnabled ? `
+      ${
+        digitalWalletsEnabled
+          ? `
         .regive-amount-btn {
           background-color: var(--regive-button-txt-color);
           color: var(--regive-button-bg-color);
@@ -320,7 +333,8 @@ export class Regive {
         .regive-wallets-wrapper {
           margin: 0 20px;
         }
-        ` : `
+        `
+          : `
         .regive-amount-btn {
           background-color: var(--regive-button-bg-color);
           color: var(--regive-button-txt-color);
@@ -331,7 +345,8 @@ export class Regive {
           color: var(--regive-button-bg-color);
           border-color: var(--regive-button-bg-color);
         }
-      `}
+      `
+      }
       .regive-amount-btn:hover:not(:disabled) {
         background-color: var(--regive-button-txt-color);
         color: var(--regive-button-bg-color);
@@ -354,13 +369,14 @@ export class Regive {
               `
           <div class="regive-amounts">
             ${amounts
-                .map((amount, index) => {
-                  return `<button class="regive-amount-btn" data-amount="${amount.trim()}" ${hasCaptcha ? "disabled" : ""}>${labels[index]
-                    }</button>`;
-                })
-                .join("")}
+              .map((amount, index) => {
+                return `<button class="regive-amount-btn" data-amount="${amount.trim()}" ${hasCaptcha ? "disabled" : ""}>${
+                  labels[index]
+                }</button>`;
+              })
+              .join("")}
           </div>
-          ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ''}
+          ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ""}
           `
             );
           template = template.replace(
@@ -404,12 +420,13 @@ export class Regive {
       <div class="regive-amounts">
         ${amounts
           .map((amount, index) => {
-            return `<button class="regive-amount-btn" data-amount="${amount.trim()}" ${hasCaptcha ? "disabled" : ""}>${labels[index]
-              }</button>`;
+            return `<button class="regive-amount-btn" data-amount="${amount.trim()}" ${hasCaptcha ? "disabled" : ""}>${
+              labels[index]
+            }</button>`;
           })
           .join("")}
       </div>
-      ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ''}
+      ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ""}
       </div>
     `;
     }
@@ -438,7 +455,7 @@ export class Regive {
         const amount = (event.currentTarget as HTMLButtonElement).dataset
           .amount as string;
         this.log("Amount button clicked", "💰", { amount });
-        if(digitalWalletsEnabled) {
+        if (digitalWalletsEnabled) {
           // Mark the button as selected, unmark other buttons.
           buttons.forEach((btn) => {
             if (btn === event.currentTarget) {
@@ -457,24 +474,42 @@ export class Regive {
     this.sendHeightToParent();
     if (hasCaptcha) {
       // Teleport '.en__captcha' to '.regive-captcha-container'
-      const captchaContainer = banner.querySelector(".regive-captcha-container") as HTMLDivElement | null;
+      const captchaContainer = banner.querySelector(
+        ".regive-captcha-container"
+      ) as HTMLDivElement | null;
       if (!captchaContainer) {
-        this.log('CAPTCHA detected but the theme has no captcha container. Custom themes must include <div class="regive-captcha-container"></div>. Regive will not run.', "🔴");
+        this.log(
+          'CAPTCHA detected but the theme has no captcha container. Custom themes must include <div class="regive-captcha-container"></div>. Regive will not run.',
+          "🔴"
+        );
         this.exit();
         return;
       }
-      const captcha = document.querySelector(".en__captcha") as HTMLElement | null;
+      const captcha = document.querySelector(
+        ".en__captcha"
+      ) as HTMLElement | null;
       if (captcha) {
-        this.log("CAPTCHA found in the page, teleporting it to the banner", "🟢");
+        this.log(
+          "CAPTCHA found in the page, teleporting it to the banner",
+          "🟢"
+        );
         captchaContainer.appendChild(captcha);
         this.overrideCaptchaCallbacks(captcha);
         this.sendHeightToParent();
       } else {
-        this.log("CAPTCHA not found in the page, setting up mutation observer to watch for it", "⚠️");
+        this.log(
+          "CAPTCHA not found in the page, setting up mutation observer to watch for it",
+          "⚠️"
+        );
         const observer = new MutationObserver(() => {
-          const captchaElement = document.querySelector(".en__captcha") as HTMLElement | null;
+          const captchaElement = document.querySelector(
+            ".en__captcha"
+          ) as HTMLElement | null;
           if (captchaElement) {
-            this.log("CAPTCHA found in the page, teleporting it to the banner", "🟢");
+            this.log(
+              "CAPTCHA found in the page, teleporting it to the banner",
+              "🟢"
+            );
             clearTimeout(timer);
             observer.disconnect();
             captchaContainer.appendChild(captchaElement);
@@ -485,55 +520,94 @@ export class Regive {
         observer.observe(document.body, { childList: true, subtree: true });
         const timer = setTimeout(() => {
           observer.disconnect();
-          this.log("CAPTCHA not found in the page after 5 seconds, exiting", "🔴");
+          this.log(
+            "CAPTCHA not found in the page after 5 seconds, exiting",
+            "🔴"
+          );
           this.exit();
         }, 5000);
       }
     }
-    if(digitalWalletsEnabled) {
+    if (digitalWalletsEnabled) {
       // Amount button setup - if there is only one amount option, hide the amount buttons and just use that amount. If there are multiple amount options, show the buttons and select the first one as default.
-      if(amounts && amounts.length === 1) {
+      if (amounts && amounts.length === 1) {
         this.log("Only one amount option, hiding amount buttons", "⚠️");
-        const amountsWrapper = banner.querySelector(".regive-amounts") as HTMLElement;
-        if(amountsWrapper) {
+        const amountsWrapper = banner.querySelector(
+          ".regive-amounts"
+        ) as HTMLElement;
+        if (amountsWrapper) {
           amountsWrapper.style.display = "none";
         }
       } else {
-        this.log("Multiple amount options, showing amount buttons and selecting first as default", "🟢");
-        banner.querySelector(".regive-amount-btn")?.classList.add("regive-selected");
+        this.log(
+          "Multiple amount options, showing amount buttons and selecting first as default",
+          "🟢"
+        );
+        banner
+          .querySelector(".regive-amount-btn")
+          ?.classList.add("regive-selected");
       }
       this.setAmount(amounts[0].trim());
-      const regiveWalletsWrapper = banner.querySelector(".regive-wallets-wrapper") as HTMLElement;
-      const digitalWalletsWrapper = document.querySelector(".digital-wallets-wrapper") as HTMLElement;
+      const regiveWalletsWrapper = banner.querySelector(
+        ".regive-wallets-wrapper"
+      ) as HTMLElement;
+      const digitalWalletsWrapper = document.querySelector(
+        ".digital-wallets-wrapper"
+      ) as HTMLElement;
       // Find if there are any iframes within .digital-wallets-wrapper, and if not, create a mutation observer to watch for them
-      if(!digitalWalletsWrapper && paymentMethod !== "card") {
-        this.log(`Original payment method was ${paymentMethod}, digital wallets form block was not found in the page.`, "🔴");
+      if (!digitalWalletsWrapper && paymentMethod !== "card") {
+        this.log(
+          `Original payment method was ${paymentMethod}, digital wallets form block was not found in the page.`,
+          "🔴"
+        );
         this.exit();
         return;
       }
-      if(digitalWalletsWrapper.querySelector("iframe") || (paymentMethod === "daf" && digitalWalletsWrapper.querySelector("#chariot-button"))) {
+      if (
+        digitalWalletsWrapper.querySelector("iframe") ||
+        (paymentMethod === "daf" &&
+          digitalWalletsWrapper.querySelector("#chariot-button"))
+      ) {
         this.log("Digital wallets form block found in the page", "🟢");
-        regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
+        regiveWalletsWrapper.insertAdjacentElement(
+          "afterbegin",
+          digitalWalletsWrapper
+        );
         this.addDigitalWalletSubmitListeners(paymentMethod);
         this.sendMessageToParent("enabled");
       } else {
-        this.log("Digital wallets form block not found in the page, setting up mutation observer to watch for it", "⚠️");
+        this.log(
+          "Digital wallets form block not found in the page, setting up mutation observer to watch for it",
+          "⚠️"
+        );
         const observer = new MutationObserver(() => {
           const walletFrame = digitalWalletsWrapper.querySelector("iframe");
-          const chariotButton = paymentMethod === "daf" ? digitalWalletsWrapper.querySelector("#chariot-button") : null;
+          const chariotButton =
+            paymentMethod === "daf"
+              ? digitalWalletsWrapper.querySelector("#chariot-button")
+              : null;
           if (walletFrame || chariotButton) {
             this.log("Digital wallets form block found in the page", "🟢");
             clearTimeout(timer);
             observer.disconnect();
-            regiveWalletsWrapper.insertAdjacentElement("afterbegin",digitalWalletsWrapper);
+            regiveWalletsWrapper.insertAdjacentElement(
+              "afterbegin",
+              digitalWalletsWrapper
+            );
             this.addDigitalWalletSubmitListeners(paymentMethod);
             this.sendMessageToParent("enabled");
           }
         });
-        observer.observe(digitalWalletsWrapper, { childList: true, subtree: true });
+        observer.observe(digitalWalletsWrapper, {
+          childList: true,
+          subtree: true,
+        });
         const timer = setTimeout(() => {
           observer.disconnect();
-          this.log("Digital wallets form block not found in the page after 5 seconds, exiting", "🔴");
+          this.log(
+            "Digital wallets form block not found in the page after 5 seconds, exiting",
+            "🔴"
+          );
           this.exit();
         }, 5000);
       }
@@ -560,9 +634,14 @@ export class Regive {
 
   private overrideCaptchaCallbacks(captcha: HTMLElement) {
     // Get the g-recaptcha element inside the captcha container
-    const recaptcha = captcha.querySelector(".g-recaptcha") as HTMLElement | null;
+    const recaptcha = captcha.querySelector(
+      ".g-recaptcha"
+    ) as HTMLElement | null;
     if (!recaptcha) {
-      this.log("g-recaptcha element not found inside the captcha container. aborting", "🔴")
+      this.log(
+        "g-recaptcha element not found inside the captcha container. aborting",
+        "🔴"
+      );
       this.exit();
       return;
     }
@@ -572,9 +651,17 @@ export class Regive {
     // (e.g. EN step reloads), the override must be re-applied.
     const globalWindow = window as Record<string, any>;
     const originalCallback = recaptcha.getAttribute("data-callback");
-    const originalExpiredCallback = recaptcha.getAttribute("data-expired-callback");
-    if (!originalCallback || typeof globalWindow[originalCallback] !== 'function') {
-      this.log(`g-recaptcha data-callback "${originalCallback}" is missing or not a global function. Amount buttons would never unlock, aborting.`, "🔴");
+    const originalExpiredCallback = recaptcha.getAttribute(
+      "data-expired-callback"
+    );
+    if (
+      !originalCallback ||
+      typeof globalWindow[originalCallback] !== "function"
+    ) {
+      this.log(
+        `g-recaptcha data-callback "${originalCallback}" is missing or not a global function. Amount buttons would never unlock, aborting.`,
+        "🔴"
+      );
       this.exit();
       return;
     }
@@ -585,20 +672,28 @@ export class Regive {
       this.isCaptchaUnlocked = true;
       original(token);
     };
-    if (originalExpiredCallback && typeof globalWindow[originalExpiredCallback] === 'function') {
+    if (
+      originalExpiredCallback &&
+      typeof globalWindow[originalExpiredCallback] === "function"
+    ) {
       // Run our handle Captcha expired function first, then call the original expired callback
-      const originalExpired = globalWindow[originalExpiredCallback] as () => void;
+      const originalExpired = globalWindow[
+        originalExpiredCallback
+      ] as () => void;
       globalWindow[originalExpiredCallback] = () => {
         this.lockButtons();
         this.isCaptchaUnlocked = false;
         originalExpired();
       };
     } else {
-      this.log(`g-recaptcha data-expired-callback "${originalExpiredCallback}" is missing or not a global function. Buttons will not re-lock on token expiry.`, "⚠️");
+      this.log(
+        `g-recaptcha data-expired-callback "${originalExpiredCallback}" is missing or not a global function. Buttons will not re-lock on token expiry.`,
+        "⚠️"
+      );
     }
   }
 
-  private writeHiddenFields() {
+  private writeHiddenFields(paymentMethod: string) {
     const source = this.options?.source || "REGIVE";
     const sourceField = this.ENgrid.getField(
       "supporter.appealCode"
@@ -623,12 +718,16 @@ export class Regive {
     if (paymentTypeField) {
       paymentTypeField.value = paymentMethod;
     }
-    const giveBySelect = (document.querySelector(`input[name='transaction.giveBySelect'][value='${paymentMethod}']`) as HTMLInputElement);
-    if(giveBySelect) {
-      this.log("Setting giveBySelect to match the payment method", "💾", { paymentMethod });
+    const giveBySelect = document.querySelector(
+      `input[name='transaction.giveBySelect'][value='${paymentMethod}']`
+    ) as HTMLInputElement;
+    if (giveBySelect) {
+      this.log("Setting giveBySelect to match the payment method", "💾", {
+        paymentMethod,
+      });
       giveBySelect.checked = true;
     }
-    if(paymentMethod == "card") {
+    if (paymentMethod == "card") {
       this.writeHiddenCardFields();
     }
   }
@@ -725,7 +824,9 @@ export class Regive {
     return false;
   }
   private detectPaymentMethod(): string {
-    const paymentType = localStorage.getItem("regive-paymenttype") || (this.hasVgsTokens() ? "card" : "digitalwallet-unknown");
+    const paymentType =
+      localStorage.getItem("regive-paymenttype") ||
+      (this.hasVgsTokens() ? "card" : "digitalwallet-unknown");
     this.log("Detected payment method", "💳", { paymentType });
     return paymentType;
   }
@@ -748,7 +849,7 @@ export class Regive {
     });
     if (this.options?.test) {
       this.log("Test mode enabled. Skipping required fields enforcement", "⚠️");
-      ENGrid.setFieldValue('supporter.emailAddress', 'testing@noaddress.ea')
+      ENGrid.setFieldValue("supporter.emailAddress", "testing@noaddress.ea");
       return true;
     }
     return allFilled;
@@ -822,7 +923,9 @@ export class Regive {
       const txtColor = regiveTag.getAttribute("txt-color") || "#333";
       const test = this.isOptionEnabled(regiveTag.getAttribute("test"));
       const basePage = regiveTag.getAttribute("base-page") || "";
-      const digitalWallets = this.isOptionEnabled(regiveTag.getAttribute("digital-wallets"));
+      const digitalWallets = this.isOptionEnabled(
+        regiveTag.getAttribute("digital-wallets")
+      );
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -1062,7 +1165,11 @@ export class Regive {
         );
         // Assign the value to the options object
         // Convert boolean string values to actual booleans
-        if (camelCaseKey === "test" || camelCaseKey === "confetti" || camelCaseKey === "digitalWallets") {
+        if (
+          camelCaseKey === "test" ||
+          camelCaseKey === "confetti" ||
+          camelCaseKey === "digitalWallets"
+        ) {
           if (this.isOptionEnabled(value)) {
             (this.options as any)[camelCaseKey] = true;
           } else if (value === "false") {
@@ -1241,9 +1348,7 @@ export class Regive {
       const feeCoverType =
         window.EngagingNetworks?.feeCover?.feeCover?.type || "PERCENT";
       if (feeCoverType === "PERCENT") {
-        amount = (parseFloat(amount) / (1 + feeCoverPercent / 100)).toFixed(
-          2
-        );
+        amount = (parseFloat(amount) / (1 + feeCoverPercent / 100)).toFixed(2);
       } else if (feeCoverType === "AMOUNT") {
         amount = (parseFloat(amount) - feeCoverAmount).toFixed(2);
       }
@@ -1252,7 +1357,9 @@ export class Regive {
     let found = Array.from(
       document.querySelectorAll('input[name="transaction.donationAmt"]')
     ).filter(
-      (el) => el instanceof HTMLInputElement && parseFloat(el.value) == parseFloat(amount)
+      (el) =>
+        el instanceof HTMLInputElement &&
+        parseFloat(el.value) == parseFloat(amount)
     );
     // We found the amount on the radio boxes, so check it
     const otherField = document.querySelector(
@@ -1284,7 +1391,8 @@ export class Regive {
       this.log("Not submitting form because CAPTCHA is not unlocked", "🔴");
       this.sendMessageToParent("loaded");
       return;
-    } if (!this.hasRequiredFields()) {
+    }
+    if (!this.hasRequiredFields()) {
       this.log(
         "Not submitting form because required fields are not filled",
         "🔴"
@@ -1329,41 +1437,53 @@ export class Regive {
   private addDigitalWalletSubmitListeners(paymentMethod: string) {
     switch (paymentMethod) {
       case "stripedigitalwallet":
-          window.EngagingNetworks?.require?._defined?.enStripeButtons?.stripeButtons?.paymentRequest?.on("paymentmethod", () => {
+        window.EngagingNetworks?.require?._defined?.enStripeButtons?.stripeButtons?.paymentRequest?.on(
+          "paymentmethod",
+          () => {
             this.log("Clicked Stripe Digital Wallet Button", "💳");
             localStorage.setItem(
               "regive-submitted",
               this.ENgrid.getPageID().toString()
             );
-          });
+          }
+        );
         break;
       case "paypaltouch":
       case "paypal-onetouch":
       case "paypal-one-touch":
       case "paypalonetouch":
-          const paypalTouch = window.EngagingNetworks?.require?._defined?.enPaypalTouch?.paypalTouch,
-            buttons = paypalTouch.library.Buttons.bind(paypalTouch.library);
-          paypalTouch.library.Buttons = (o: any) =>
-            buttons({
-              ...o,
-              onClick: (d: any, a: any) => {
-                this.log("Clicked PayPal Touch Button", "💳");
-                const v = this.ENgrid.getFieldValue("transaction.donationAmt");
-                const o2 = this.ENgrid.getFieldValue("transaction.donationAmt.other");
-                this.log("Current amount values before submission", "ℹ️", { amt: v, other: o2 });
-                localStorage.setItem(
-                  "regive-submitted",
-                  this.ENgrid.getPageID().toString()
-                );
-                o.onClick && o.onClick(d, a);
-              },
-            });
-          paypalTouch.unloadButton && paypalTouch.unloadButton();
-          paypalTouch.loadButton && paypalTouch.loadButton();
+        const paypalTouch =
+            window.EngagingNetworks?.require?._defined?.enPaypalTouch
+              ?.paypalTouch,
+          buttons = paypalTouch.library.Buttons.bind(paypalTouch.library);
+        paypalTouch.library.Buttons = (o: any) =>
+          buttons({
+            ...o,
+            onClick: (d: any, a: any) => {
+              this.log("Clicked PayPal Touch Button", "💳");
+              const v = this.ENgrid.getFieldValue("transaction.donationAmt");
+              const o2 = this.ENgrid.getFieldValue(
+                "transaction.donationAmt.other"
+              );
+              this.log("Current amount values before submission", "ℹ️", {
+                amt: v,
+                other: o2,
+              });
+              localStorage.setItem(
+                "regive-submitted",
+                this.ENgrid.getPageID().toString()
+              );
+              o.onClick && o.onClick(d, a);
+            },
+          });
+        paypalTouch.unloadButton && paypalTouch.unloadButton();
+        paypalTouch.loadButton && paypalTouch.loadButton();
         break;
       case "daf":
       case "dafpay":
-          document.getElementById("chariot-button")?.addEventListener("click", () => {
+        document
+          .getElementById("chariot-button")
+          ?.addEventListener("click", () => {
             this.log("Clicked DAF Button", "💳");
             localStorage.setItem(
               "regive-submitted",
