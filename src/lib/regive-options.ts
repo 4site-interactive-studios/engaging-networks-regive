@@ -49,4 +49,7 @@ export interface RegiveOptions {
 
   /** Specify a payment method for testing purposes (e.g., "card", "stripedigitalwallets") */
   testMethod?: string;
+
+  /** Comma-separated list of mandatory field names to ignore when empty */
+  ignoreRequiredFields?: string;
 }
