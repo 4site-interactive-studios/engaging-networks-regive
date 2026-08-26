@@ -94,19 +94,38 @@ export class Regive {
     if (this.isEmbedded) {
       this.log("Page is embedded", "ℹ️");
       this.loadOptionsFromUrl();
-      const submissionFailed = !!(
-        (this.ENgrid.checkNested(
-          window.EngagingNetworks,
-          "require",
-          "_defined",
-          "enjs",
-          "checkSubmissionFailed"
-        ) &&
-          window.EngagingNetworks?.require._defined.enjs.checkSubmissionFailed()) ||
-        !!document.querySelector(".en__errorList li")
+      const enjsCheckAvailable = !!this.ENgrid.checkNested(
+        window.EngagingNetworks,
+        "require",
+        "_defined",
+        "enjs",
+        "checkSubmissionFailed"
       );
+      const enjsSubmissionFailed = !!(
+        enjsCheckAvailable &&
+        window.EngagingNetworks?.require._defined.enjs.checkSubmissionFailed()
+      );
+      const errorListItems = Array.from(
+        document.querySelectorAll<HTMLElement>(".en__errorList li")
+      );
+      const errorMessages = errorListItems
+        .map((item) => item.textContent?.trim())
+        .filter((text): text is string => !!text);
+      const submissionFailed = enjsSubmissionFailed || errorListItems.length > 0;
       if (submissionFailed) {
-        this.log("Server-side submission failed. Exiting", "🔴");
+        this.log(
+          `Server-side submission failed. Exiting. Details: ${JSON.stringify(
+            {
+              enjsCheckAvailable,
+              enjsSubmissionFailed,
+              errorListItemCount: errorListItems.length,
+              errorMessages,
+            },
+            null,
+            2
+          )}`,
+          "🔴"
+        );
         this.exit();
         return;
       }
@@ -823,6 +842,7 @@ export class Regive {
   }
   private detectPaymentMethod(): string {
     const paymentType =
+      localStorage.getItem("regive-dw-paymenttype") ||
       localStorage.getItem("regive-paymenttype") ||
       (this.hasVgsTokens() ? "card" : "unknown");
     this.log("Detected payment method", "💳", { paymentType });
@@ -903,6 +923,7 @@ export class Regive {
     localStorage.removeItem("regive-submitted");
     localStorage.removeItem("regive-height");
     localStorage.removeItem("regive-paymenttype");
+    localStorage.removeItem("regive-dw-paymenttype");
   }
 
   private appendToUrl(url: string, params: string): string {
@@ -1050,7 +1071,13 @@ export class Regive {
     // Create mutation observer
     this._observer = new MutationObserver(() => {
       // Check all our target fields on any DOM change
-      saveFieldToStorage("transaction.ccnumber", "regive-num");
+      // Don't let the form field value overwrite a detected digital wallet
+      // payment type - wallets use values not present in the form field
+      if (!localStorage.getItem("regive-dw-paymenttype")) {
+        saveFieldToStorage("transaction.paymenttype", "regive-paymenttype");
+      }
+      saveFieldToStorage("transaction.ccnumber", "regive-num") &&
+        localStorage.removeItem("regive-dw-paymenttype");
       saveFieldToStorage("transaction.ccvv", "regive-ver");
       saveFieldToStorage("transaction.ccexpire", "regive-exp");
       saveFieldToStorage("transaction.vgs.cardType", "regive-card");
@@ -1060,7 +1087,7 @@ export class Regive {
     this.waitForDigitalWalletUI(() => {
       this.addDigitalWalletSubmitListeners(null, (methodOut) => {
         this.log("Digital Wallet Submit Detected", "💳", { methodOut });
-        localStorage.setItem("regive-paymenttype", methodOut);
+        localStorage.setItem("regive-dw-paymenttype", methodOut);
       });
     });
 
