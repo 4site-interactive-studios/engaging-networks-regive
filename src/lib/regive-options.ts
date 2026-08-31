@@ -52,4 +52,7 @@ export interface RegiveOptions {
 
   /** Comma-separated list of mandatory field names to ignore when empty */
   ignoreRequiredFields?: string;
+
+  /** Amount that supporter gifted during their initial gift, formatted with the currency symbol */
+  giftAmount?: string;
 }

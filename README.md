@@ -101,14 +101,15 @@ Available themes:
 
 ### Advanced Options
 
-| Option     | Description                                     | Example                                                               | Default     |
-| ---------- | ----------------------------------------------- | --------------------------------------------------------------------- | ----------- |
-| `confetti` | Enable/disable confetti or set custom colors    | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"` |
-| `test`     | Enable test mode without actual form submission | `test="true"`                                                         | `false`     |
-| `digital-wallets` | Enable digital wallet payment methods | `digital-wallets="true"` | `false` |
-| `params`   | Additional URL parameters to pass to the iFrame | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`      |
-| `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
-| `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"` | `null` |
+| Option                   | Description                                                        | Example                                                               | Default                        |
+| ------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------ |
+| `confetti`               | Enable/disable confetti or set custom colors                       | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"`                    |
+| `test`                   | Enable test mode without actual form submission                    | `test="true"`                                                         | `false`                        |
+| `digital-wallets`        | Enable digital wallet payment methods                              | `digital-wallets="true"`                                              | `false`                        |
+| `params`                 | Additional URL parameters to pass to the iFrame                    | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`                         |
+| `base-page`              | EN page ID to process the donation through                         | `base-page="12345"`                                                   | Same as original donation page |
+| `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"`  | `null`                         |
+| `gift-amount`            | Insert for the amount the supporter initially gave                 | `gift-amount="{receipt_data~amount~[en1]}"`                           | `null`                         |
 
 #### Base Page Option
 
@@ -209,6 +210,7 @@ You can also specify a payment method to test using the `test-method` attribute.
 ```
 
 Accepted values for `test-method` include:
+
 - `card`
 - `applepay`
 - `googlepay`

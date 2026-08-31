@@ -111,7 +111,8 @@ export class Regive {
       const errorMessages = errorListItems
         .map((item) => item.textContent?.trim())
         .filter((text): text is string => !!text);
-      const submissionFailed = enjsSubmissionFailed || errorListItems.length > 0;
+      const submissionFailed =
+        enjsSubmissionFailed || errorListItems.length > 0;
       if (submissionFailed) {
         this.log(
           `Server-side submission failed. Exiting. Details: ${JSON.stringify(
