@@ -41,6 +41,15 @@ export interface RegiveOptions {
   /** Base page ID to process the donation through */
   basePage?: string;
 
+  /** Enable digital wallet payment methods */
+  digitalWallets?: boolean;
+
   /** Enable test mode without actual form submission */
   test?: boolean;
+
+  /** Specify a payment method for testing purposes (e.g., "card", "stripedigitalwallets") */
+  testMethod?: string;
+
+  /** Comma-separated list of mandatory field names to ignore when empty */
+  ignoreRequiredFields?: string;
 }

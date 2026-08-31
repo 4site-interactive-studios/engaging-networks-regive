@@ -67,7 +67,8 @@ body[data-regive-embedded="true"] {
     text-align: center;
   }
   .regive-amount-btn:disabled {
-    background-color: #ccc;
+    opacity: 0.5;
+    filter: grayscale(70%);
     cursor: not-allowed;
   }
   .regive-currency {
