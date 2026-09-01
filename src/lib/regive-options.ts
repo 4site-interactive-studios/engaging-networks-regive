@@ -55,4 +55,10 @@ export interface RegiveOptions {
 
   /** Amount that supporter gifted during their initial gift, formatted with the currency symbol */
   giftAmount?: string;
+
+  /** Minimum amount that can be gifted */
+  minAmount?: string;
+
+  /** Maximum amount that can be gifted */
+  maxAmount?: string;
 }

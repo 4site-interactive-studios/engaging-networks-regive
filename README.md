@@ -64,10 +64,14 @@ The Regive component can be customized using various attributes on the `<regive>
 
 ### Amount Options
 
-| Option         | Description                                                             | Example                                | Default            |
-| -------------- | ----------------------------------------------------------------------- | -------------------------------------- | ------------------ |
-| `amount`       | Comma-separated list of donation amounts to display as buttons          | `amount="5,8,10"`                      | `"5"`              |
-| `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag) | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
+| Option         | Description                                                                   | Example                                | Default            |
+| -------------- | ----------------------------------------------------------------------------- | -------------------------------------- | ------------------ |
+| `amount`       | Comma-separated list of donation amounts or percentages to display as buttons | `amount="5,8,10"`                      | `"5"`              |
+| `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag)       | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
+
+#### About Percentages
+
+Percentages allow you to specify donation amounts as a percentage of the user's previous gift. For example, `amount="50%"` will set the donation amount to 50% of the user's last gift (A user gifts $50, the Regive box would then ask for $25). You can mix percentage amounts with fixed amounts ie. `amount="50%,10,35"` - amounts will be sorted from least to greatest after percentage calculations.
 
 ### Text Customization
 
@@ -110,12 +114,18 @@ Available themes:
 | `base-page`              | EN page ID to process the donation through                         | `base-page="12345"`                                                   | Same as original donation page |
 | `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"`  | `null`                         |
 | `gift-amount`            | Insert for the amount the supporter initially gave                 | `gift-amount="{receipt_data~amount~[en1]}"`                           | `null`                         |
+| `min-amount`             | Minimum amount for a percentage gift to be                         | `min-amount="1"`                                                      | `1`                            |
+| `max-amount`             | Maximum amount for a percentage gift amount to be                  | `max-amount="100"`                                                    | `null`                         |
 
 #### Base Page Option
 
 By default, Regive processes the additional donation through the same page as the original donation. However, you can specify a different base page for processing the regive donation using the `base-page` attribute. This allows you to route the additional donation through a specific page that may have different settings, configurations, or tracking parameters. In this case, the `base-page` should be set to the page ID of the desired page in Engaging Networks.
 
 **Note:** When using the `base-page` option, make sure that the specified page is properly set up to handle the donation (Contains all necessary fields for Engaging Networks to process the donation), and that it has the Regive script included on both pages. All instructions for "Page 1" of the donation form (such as adding the custom theme template) should be followed for the specified base page.
+
+#### Min and Max Amounts
+
+The values for min and max amounts only apply to percentage/dynamic amounts.
 
 ## Custom Theming
 
@@ -367,6 +377,23 @@ Here's a more complex example with custom theming and test mode:
 <!-- THIS SHOULD GO ON THE THANK YOU PAGE -->
 <regive
   amount="8"
+  button-label="give {{amount}} more"
+  heading="Adopt a kitten today!"
+  thank-you-message="You have a new furry friend! 🐱"
+  theme="kitten-theme"
+  test="true"
+>
+</regive>
+```
+
+Here's an example of a regive block with dynamic amounts:
+
+```html
+<regive
+  amount="8,15,25%,50%"
+  gift-amount="{receipt_data~amount~[en1]}"
+  min-amount="1"
+  max-amount="100"
   button-label="give {{amount}} more"
   heading="Adopt a kitten today!"
   thank-you-message="You have a new furry friend! 🐱"

@@ -1230,7 +1230,68 @@ export class Regive {
       }
     }
 
+    this.processAmounts(this.options);
+
     this.log("Loaded options from URL", "ℹ️", this.options);
+  }
+
+  private processAmounts(options: RegiveOptions) {
+    if (!options.amount) return;
+    // Parse a numeric amount, rejecting unresolved merge tags and stripping currency formatting
+    const parseAmount = (value: string | null | undefined): number =>
+      !value || value.includes("{")
+        ? NaN
+        : parseFloat(value.replace(/[^0-9.]/g, ""));
+
+    // Get the user's gift amount, falling back to the value stored on the donation page
+    let giftAmount = parseAmount(options.giftAmount);
+    if (isNaN(giftAmount)) {
+      giftAmount = parseAmount(localStorage.getItem("regive-donation-amt"));
+    }
+
+    // Get the minimum and maximum guardrails, if applicable
+    const parsedMin = parseAmount(options.minAmount);
+    const minAmount = !isNaN(parsedMin) && parsedMin > 0 ? parsedMin : 1;
+    let maxAmount: number | undefined = parseAmount(options.maxAmount);
+    if (isNaN(maxAmount)) maxAmount = undefined;
+    if (maxAmount !== undefined && minAmount > maxAmount) {
+      this.log(
+        `Minimum amount (${minAmount}) is greater than maximum amount (${maxAmount}). Only accepting minimum value`,
+        "⚠️"
+      );
+      maxAmount = undefined;
+    }
+    if (giftAmount <= 0) {
+      this.log(
+        `Gift amount (${giftAmount}) is less than or equal to 0. Using minimum amount (${minAmount})`,
+        "⚠️"
+      );
+      giftAmount = minAmount;
+    }
+
+    // Parse each token: a fixed amount or a percentage of the gift
+    const resolved = new Set<number>();
+    for (const token of options.amount.split(",")) {
+      let value = parseFloat(token);
+      if (token.includes("%")) {
+        const percentage = value;
+        if (isNaN(percentage) || percentage <= 0) {
+          this.log(`Invalid percentage: ${token}`, "⚠️");
+          continue;
+        }
+        value = Math.round((giftAmount * percentage) / 100); // Advanced rounding logic in task 4
+        value = Math.max(
+          minAmount,
+          maxAmount !== undefined ? Math.min(value, maxAmount) : value
+        );
+      }
+      if (!isNaN(value) && value > 0) {
+        resolved.add(value);
+      } else {
+        this.log(`Invalid amount: ${token}`, "⚠️");
+      }
+    }
+    options.amount = [...resolved].sort((a, b) => a - b).join(",");
   }
 
   // Send an action to the parent window
