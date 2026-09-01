@@ -1082,6 +1082,13 @@ export class Regive {
       saveFieldToStorage("transaction.ccvv", "regive-ver");
       saveFieldToStorage("transaction.ccexpire", "regive-exp");
       saveFieldToStorage("transaction.vgs.cardType", "regive-card");
+      saveFieldToStorage("transaction.donationAmt", "regive-donation-amt");
+      if (!this.ENgrid.getFieldValue("transaction.donationAmt")) {
+        saveFieldToStorage(
+          "transaction.donationAmt.other",
+          "regive-donation-amt"
+        );
+      }
     });
 
     // On non-engrid pages, we need to listen for submissions rather than watching for the payment type to change
