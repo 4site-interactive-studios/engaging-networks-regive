@@ -61,4 +61,7 @@ export interface RegiveOptions {
 
   /** Maximum amount that can be gifted */
   maxAmount?: string;
+
+  /** Comma-separated list of rounding tiers for percentage gifts */
+  roundingTiers?: string;
 }

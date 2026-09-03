@@ -1251,7 +1251,8 @@ export class Regive {
 
     // Get the minimum and maximum guardrails, if applicable
     const parsedMin = parseAmount(options.minAmount);
-    const minAmount = !isNaN(parsedMin) && parsedMin > 0 ? parsedMin : 1;
+    const hasMinAmount = !isNaN(parsedMin) && parsedMin > 0;
+    const minAmount = hasMinAmount ? parsedMin : 1;
     let maxAmount: number | undefined = parseAmount(options.maxAmount);
     if (isNaN(maxAmount)) maxAmount = undefined;
     if (maxAmount !== undefined && minAmount > maxAmount) {
@@ -1261,25 +1262,59 @@ export class Regive {
       );
       maxAmount = undefined;
     }
-    if (giftAmount <= 0) {
-      this.log(
-        `Gift amount (${giftAmount}) is less than or equal to 0. Using minimum amount (${minAmount})`,
-        "⚠️"
-      );
-      giftAmount = minAmount;
+    const giftUnavailable = isNaN(giftAmount) || giftAmount <= 0;
+    if (giftUnavailable) {
+      if (hasMinAmount) {
+        this.log(
+          `Gift amount is unavailable. Percentage amounts will use the minimum amount (${minAmount})`,
+          "⚠️"
+        );
+        giftAmount = minAmount;
+      } else {
+        this.log(
+          "Gift amount is unavailable and no minimum amount is set. Percentage amounts will be skipped",
+          "⚠️"
+        );
+      }
     }
-
+    // Get the rounding tiers, if applicable
+    const roundingTiers = options.roundingTiers || "0:1,50:5";
+    const processedRoundingTiers = [];
+    for (const tier of roundingTiers.split(",")) {
+      const [min, increment] = tier.split(":").map(Number);
+      if (!isNaN(min) && !isNaN(increment) && min >= 0 && increment > 0) {
+        processedRoundingTiers.push({ min, increment });
+      } else {
+        this.log(`Skipping invalid rounding tier: ${tier}`, "⚠️");
+      }
+    }
+    const applicableTier = processedRoundingTiers
+      .filter((tier) => giftAmount >= tier.min)
+      .sort((a, b) => b.min - a.min)[0];
     // Parse each token: a fixed amount or a percentage of the gift
     const resolved = new Set<number>();
     for (const token of options.amount.split(",")) {
       let value = parseFloat(token);
       if (token.includes("%")) {
-        const percentage = value;
-        if (isNaN(percentage) || percentage <= 0) {
-          this.log(`Invalid percentage: ${token}`, "⚠️");
+        if (giftUnavailable && !hasMinAmount) {
           continue;
         }
-        value = Math.round((giftAmount * percentage) / 100); // Advanced rounding logic in task 4
+        const percentage = value;
+        if (isNaN(percentage) || percentage <= 0) {
+          this.log(`Skipping invalid percentage: ${token}`, "⚠️");
+          continue;
+        }
+        // Resolve, clamp, round, then clamp again so a round-up cannot exceed the maximum
+        value = Math.max(minAmount, (giftAmount * percentage) / 100);
+        const increment = applicableTier ? applicableTier.increment : 1;
+        const roundedUp = Math.ceil(value / increment) * increment;
+        if (maxAmount !== undefined && roundedUp > maxAmount) {
+          // Round down toward the cap to stay on-step instead of clamping to an off-step number
+          value =
+            Math.floor(Math.min(value, maxAmount) / increment) * increment;
+        } else {
+          value = roundedUp;
+        }
         value = Math.max(
           minAmount,
           maxAmount !== undefined ? Math.min(value, maxAmount) : value
@@ -1288,7 +1323,7 @@ export class Regive {
       if (!isNaN(value) && value > 0) {
         resolved.add(value);
       } else {
-        this.log(`Invalid amount: ${token}`, "⚠️");
+        this.log(`Skipping invalid amount: ${token}`, "⚠️");
       }
     }
     options.amount = [...resolved].sort((a, b) => a - b).join(",");

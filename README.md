@@ -116,6 +116,7 @@ Available themes:
 | `gift-amount`            | Insert for the amount the supporter initially gave                 | `gift-amount="{receipt_data~amount~[en1]}"`                           | `null`                         |
 | `min-amount`             | Minimum amount for a percentage gift to be                         | `min-amount="1"`                                                      | `1`                            |
 | `max-amount`             | Maximum amount for a percentage gift amount to be                  | `max-amount="100"`                                                    | `null`                         |
+| `rounding-tiers`         | Comma-separated list of rounding tiers for percentage gifts        | `rounding-tiers="0:1,50:5"`                                           | `0:1,50:5`                     |
 
 #### Base Page Option
 
@@ -126,6 +127,10 @@ By default, Regive processes the additional donation through the same page as th
 #### Min and Max Amounts
 
 The values for min and max amounts only apply to percentage/dynamic amounts.
+
+#### Rounding tiers
+
+Rounding tiers are groups of amounts and rounding rules for percentage gifts. Each tier is defined by a minimum amount and the rounding increment. For example, `rounding-tiers="0:1,50:5"` means that amounts from 0 to 49 will be rounded to the nearest 1, and amounts from 50 onwards will be rounded to the nearest 5. The tiers are calculated based on gift amount, not calculated amounts.
 
 ## Custom Theming
 
