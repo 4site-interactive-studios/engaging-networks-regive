@@ -95,6 +95,7 @@ Percentages allow you to specify donation amounts as a percentage of the user's 
 | Option  | Description                           | Example                | Default     |
 | ------- | ------------------------------------- | ---------------------- | ----------- |
 | `theme` | Layout theme for the regive component | `theme="button-right"` | `"stacked"` |
+| `theme-rules` | Define which theme is used based on gift amount | `theme-rules="500:large-donor,1000:major-donor"` | `null` |
 
 Available themes:
 
@@ -102,6 +103,14 @@ Available themes:
 - `button-right`: Heading on left, buttons on right
 - `button-left`: Buttons on left, heading on right
 - `button-top`: Heading on top, buttons below
+
+#### About theme rules
+
+Theme rules are values paired between colons (`:`) and separated by commas.
+
+For example, the rule `500:large-donor,1000:major-donor` means that if the gift amount is 500 or more, the `large-donor` theme will be applied, and if the gift amount is 1000 or more, the `major-donor` theme will be applied. Any gift amount below the first threshold will use the theme specified by the `theme` attribute or the default built-in theme, if no `theme` attribute is provided.
+
+By default, there are no theme rules applied, and the component will use the theme specified by the `theme` attribute or the default built-in theme if no `theme` attribute is provided. If a rule names a theme that doesn't exist (neither a built-in theme nor a <template> on the page), the component falls back to the theme attribute, and finally to the default `stacked` theme, logging a warning in debug mode.
 
 ### Advanced Options
 

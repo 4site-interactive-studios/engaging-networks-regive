@@ -35,6 +35,9 @@ export interface RegiveOptions {
   /** Layout theme - If not part of the predefined themes, it will be used as a custom theme */
   theme?: string;
 
+  /** Layout theme rules - If certain gift amounts meet the threshold, a different theme on page will be used */
+  themeRules?: string;
+
   /** Source of the donation */
   source?: string;
 

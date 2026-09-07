@@ -314,7 +314,10 @@ export class Regive {
     });
 
     const heading = this.options?.heading || null;
-    let theme = this.options?.theme || "stacked";
+    let theme = "stacked";
+    if (this.options) {
+      theme = this.getTheme(this.options);
+    }
     let template;
     const isTest = this.options?.test || false;
 
@@ -393,19 +396,41 @@ export class Regive {
       }
     </style>
     `;
-    // Check if theme is not part of the predefined themes
-    if (!this.themes.includes(theme)) {
-      const templateElement = document.getElementById(theme);
-      if (templateElement) {
-        this.log("Using custom theme from the page", "🟢", theme);
-        const templateContent = templateElement.innerHTML;
-        // Check if the template has {{button}}
-        if (templateContent.includes("{{button}}")) {
-          template =
-            templateCSS +
-            templateContent.replace(
-              "{{button}}",
-              `
+    // Resolve the theme with a fallback chain: theme rule -> theme attribute -> "stacked"
+    const attributeTheme = this.options?.theme || "stacked";
+    const themeCandidates = [theme, attributeTheme, "stacked"].filter(
+      (candidate, index, arr) => arr.indexOf(candidate) === index
+    );
+    for (const candidate of themeCandidates) {
+      // Built-in themes need no template lookup
+      if (this.themes.includes(candidate)) {
+        theme = candidate;
+        break;
+      }
+      const templateElement = document.getElementById(candidate);
+      if (!templateElement) {
+        this.log(
+          `Custom theme "${candidate}" not found - Trying next fallback`,
+          "🔴"
+        );
+        continue;
+      }
+      const templateContent = templateElement.innerHTML;
+      // Check if the template has {{button}}
+      if (!templateContent.includes("{{button}}")) {
+        this.log(
+          `Custom theme "${candidate}" does not have {{button}} - Trying next fallback`,
+          "🔴"
+        );
+        continue;
+      }
+      this.log("Using custom theme from the page", "🟢", candidate);
+      theme = candidate;
+      template =
+        templateCSS +
+        templateContent.replace(
+          "{{button}}",
+          `
           <div class="regive-amounts">
             ${amounts
               .map((amount, index) => {
@@ -417,37 +442,27 @@ export class Regive {
           </div>
           ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ""}
           `
-            );
-          template = template.replace(
-            /{{heading}}/g,
-            heading ? `<h1 class="regive-heading">${heading}</h1>` : ""
-          );
-          template = template.replace(/{{theme}}/g, theme ? theme : "");
-          template = template.replace(/{{bg-color}}/g, bgColor ? bgColor : "");
-          template = template.replace(
-            /{{txt-color}}/g,
-            txtColor ? txtColor : ""
-          );
-          template = template.replace(
-            /{{button-bg-color}}/g,
-            buttonBgColor ? buttonBgColor : ""
-          );
-          template = template.replace(
-            /{{button-txt-color}}/g,
-            buttonTxtColor ? buttonTxtColor : ""
-          );
-          templateElement.remove();
-        } else {
-          this.log(
-            "Custom theme does not have {{button}} - Using default theme",
-            "🔴"
-          );
-          theme = "stacked";
-        }
-      } else {
-        this.log("Custom theme not found - Using default theme", "🔴");
-        theme = "stacked";
-      }
+        );
+      template = template.replace(
+        /{{heading}}/g,
+        heading ? `<h1 class="regive-heading">${heading}</h1>` : ""
+      );
+      template = template.replace(/{{theme}}/g, theme ? theme : "");
+      template = template.replace(/{{bg-color}}/g, bgColor ? bgColor : "");
+      template = template.replace(
+        /{{txt-color}}/g,
+        txtColor ? txtColor : ""
+      );
+      template = template.replace(
+        /{{button-bg-color}}/g,
+        buttonBgColor ? buttonBgColor : ""
+      );
+      template = template.replace(
+        /{{button-txt-color}}/g,
+        buttonTxtColor ? buttonTxtColor : ""
+      );
+      templateElement.remove();
+      break;
     }
     if (!template) {
       this.log(`Using theme ${theme}`, "🟢");
@@ -620,6 +635,33 @@ export class Regive {
     } else {
       this.sendMessageToParent("enabled");
     }
+  }
+
+  // Resolves the theme from the gift amount and theme rules to a single theme
+  // string. This runs before the theme lookup, which handles built-in themes,
+  // custom <template> themes, and fallbacks.
+  private getTheme(options: RegiveOptions) {
+    const giftAmount = parseFloat(options.giftAmount ?? "0");
+    let selectedTheme = options.theme ?? "stacked";
+    // Only apply theme rules if a positive gift amount is specified. In case we have a special theme for smaller amounts, it will be ignored if the gift amount is zero (implied unknown).
+    let currentThreshold = -1;
+    if (options.themeRules && giftAmount > 0) {
+      const rules = options.themeRules.split(",");
+      for (const rule of rules) {
+        const [thresholdStr, theme] = rule.split(":").map((s) => s.trim());
+        const threshold = parseFloat(thresholdStr);
+        if (isNaN(threshold) || !theme) {
+          this.log(`Invalid theme rule: "${rule}". Skipping this rule.`, "⚠️");
+          continue;
+        }
+        if (giftAmount >= threshold && threshold > currentThreshold) {
+          currentThreshold = threshold;
+          selectedTheme = theme;
+        }
+      }
+    }
+    this.log(`Selected theme: "${selectedTheme}"`, "🟢");
+    return selectedTheme;
   }
 
   private unlockButtons() {
@@ -1276,6 +1318,8 @@ export class Regive {
           "⚠️"
         );
       }
+    } else {
+      options.giftAmount = giftAmount.toString();
     }
     // Get the rounding tiers, if applicable
     const roundingTiers = options.roundingTiers || "0:1,50:5";
