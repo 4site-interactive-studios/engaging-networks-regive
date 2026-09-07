@@ -52,4 +52,7 @@ export interface RegiveOptions {
 
   /** Comma-separated list of mandatory field names to ignore when empty */
   ignoreRequiredFields?: string;
+
+  /** Donation frequency for the regive donation: "onetime" (default), "monthly", "quarterly", or "annual". Recurring day defaults to the current day. */
+  frequency?: string;
 }

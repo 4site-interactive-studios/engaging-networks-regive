@@ -109,6 +109,7 @@ Available themes:
 | `params`   | Additional URL parameters to pass to the iFrame | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`      |
 | `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
 | `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"` | `null` |
+| `frequency` | Donation frequency: `onetime`, `monthly`, `quarterly`, or `annual`. The recurring day defaults to the current day. Recurring donations via digital wallets depend on gateway support | `frequency="monthly"` | `"onetime"` |
 
 #### Base Page Option
 

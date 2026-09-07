@@ -721,7 +721,7 @@ export class Regive {
       // Create the source field if it doesn't exist
       this.ENgrid.createHiddenInput("supporter.appealCode", source);
     }
-    this.setOneTimeFrequency();
+    this.setFrequency();
     // Uncheck the fee cover box if it exists
     const feeCover = this.ENgrid.getField(
       "transaction.feecover"
@@ -1658,29 +1658,81 @@ export class Regive {
         );
     }
   }
-  private setOneTimeFrequency() {
-    this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
+  private setFrequency() {
+    const frequency = (this.options?.frequency || "onetime")
+      .trim()
+      .toUpperCase();
+    const recurringFrequencies = ["MONTHLY", "QUARTERLY", "ANNUAL"];
+    if (!recurringFrequencies.includes(frequency)) {
+      if (frequency !== "ONETIME") {
+        this.log(
+          `Unknown frequency "${this.options?.frequency}", falling back to one-time`,
+          "⚠️"
+        );
+      }
+      this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
+      const recurrpayField = this.ENgrid.getField("transaction.recurrpay");
+      if (
+        recurrpayField &&
+        recurrpayField instanceof HTMLInputElement &&
+        recurrpayField.type === "radio"
+      ) {
+        // When it's a radio box, check the option with value="N"
+        const radioOptions = document.querySelectorAll(
+          'input[name="transaction.recurrpay"]'
+        ) as NodeListOf<HTMLInputElement>;
+        radioOptions.forEach((radio) => {
+          if (radio.value === "N") {
+            radio.checked = true;
+            this.log("Set recurrpay radio to N", "💾");
+          }
+        });
+      } else {
+        // When it's a hidden field, set the value to empty
+        this.ENgrid.setFieldValue("transaction.recurrpay", "");
+      }
+      this.log("Set one-time frequency", "💾");
+      return;
+    }
+    // Recurring donation: set recurrpay=Y and recurrfreq to the chosen frequency.
+    // transaction.recurrday is left untouched - EN defaults it to the current day.
     const recurrpayField = this.ENgrid.getField("transaction.recurrpay");
     if (
       recurrpayField &&
       recurrpayField instanceof HTMLInputElement &&
       recurrpayField.type === "radio"
     ) {
-      // When it's a radio box, check the option with value="N"
       const radioOptions = document.querySelectorAll(
         'input[name="transaction.recurrpay"]'
       ) as NodeListOf<HTMLInputElement>;
+      let foundYes = false;
       radioOptions.forEach((radio) => {
-        if (radio.value === "N") {
+        if (radio.value === "Y") {
           radio.checked = true;
-          this.log("Set recurrpay radio to N", "💾");
+          foundYes = true;
+          this.log("Set recurrpay radio to Y", "💾");
         }
       });
+      if (!foundYes) {
+        this.log(
+          'No recurrpay radio option with value="Y" found - the donation will be one-time',
+          "⚠️"
+        );
+      }
+    } else if (recurrpayField) {
+      this.ENgrid.setFieldValue("transaction.recurrpay", "Y");
     } else {
-      // When it's a hidden field, set the value to empty
-      this.ENgrid.setFieldValue("transaction.recurrpay", "");
+      this.ENgrid.createHiddenInput("transaction.recurrpay", "Y");
     }
-    this.log("Set one-time frequency", "💾");
+    if (this.ENgrid.getField("transaction.recurrfreq")) {
+      this.ENgrid.setFieldValue("transaction.recurrfreq", frequency);
+    } else {
+      this.ENgrid.createHiddenInput("transaction.recurrfreq", frequency);
+    }
+    this.log("Set recurring frequency", "💾", {
+      recurrpay: "Y",
+      recurrfreq: frequency,
+    });
   }
 
   // Exit the Regive Process
