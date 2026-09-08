@@ -61,7 +61,21 @@ npm run dev          # Vite dev server (http://localhost:3000)
 npm run build        # Type-check + Vite build
 npm run build:prod   # Full production build with Terser minification
 npm run watch        # Vite build in watch mode
+npm test             # Vitest unit tests (jsdom)
+npm run test:watch   # Vitest in watch mode
+npm run test:e2e     # Build, then run Playwright E2E tests (Chromium)
+npm run test:e2e:ui  # Playwright E2E tests in interactive UI mode
+npm run test:all     # Unit tests, then build + E2E tests (single full run)
 ```
+
+### Automated Tests
+
+Two layers, both dev-only (no runtime dependencies added):
+
+- **Unit tests** — Vitest + jsdom, configured in `tests/vitest.config.ts`. `tests/unit/engrid.test.ts` covers the ENGrid utility class (URL params, page detection, currency, field get/set, body data attributes, amounts, payment types).
+- **E2E tests** — Playwright (Chromium), configured in `tests/playwright.config.ts`. Specs live in `tests/e2e/*.spec.ts` and run against the real `dist/regive.js` build. `tests/e2e/server.mjs` is a zero-dependency static server that maps EN-style URLs (`/page/12345/donate/1`) to the fixture pages in `tests/e2e/fixtures/`, which mimic EN markup (`pageJson`, `form.en__component`, VGS hidden fields, `<regive>` tags). The specs cover token capture, iframe replacement, the full test-mode regive flow, postMessage sender validation, and a real second-donation submission.
+
+The manual Testing Checklist below still applies for real Engaging Networks client pages.
 
 Output lands in `dist/`:
 - `regive.js` — unminified ES module (~44 KB)
