@@ -148,7 +148,9 @@ export class Regive {
         this.ENgrid.setBodyData("embedded", "true");
         this.hideAll();
         this.addCustomBanner(paymentMethod);
+        if (this.isExited) return;
         this.writeHiddenFields(paymentMethod);
+        if (this.isExited) return;
         this.sendMessageToParent("loaded");
       } else {
         this.log("Conditions not met to modify the embedded page", "⚠️");
@@ -502,7 +504,10 @@ export class Regive {
               btn.classList.remove("regive-selected");
             }
           });
-          this.setAmount(amount);
+          if (!this.setAmount(amount)) {
+            this.exit();
+            return;
+          }
         } else {
           this.submitForm(amount);
         }
@@ -599,7 +604,10 @@ export class Regive {
           .querySelector(".regive-amount-btn")
           ?.classList.add("regive-selected");
       }
-      this.setAmount(amounts[0].trim());
+      if (!this.setAmount(amounts[0].trim())) {
+        this.exit();
+        return;
+      }
       const regiveWalletsWrapper = banner.querySelector(
         ".regive-wallets-wrapper"
       ) as HTMLElement;
@@ -740,7 +748,14 @@ export class Regive {
       // Create the source field if it doesn't exist
       this.ENgrid.createHiddenInput("supporter.appealCode", source);
     }
-    this.setFrequency();
+    if (!this.setFrequency()) {
+      this.log(
+        "Could not set the configured donation frequency on this page. Exiting instead of submitting with the wrong frequency.",
+        "🔴"
+      );
+      this.exit();
+      return;
+    }
     // Uncheck the fee cover box if it exists
     const feeCover = this.ENgrid.getField(
       "transaction.feecover"
@@ -1435,10 +1450,23 @@ export class Regive {
       this.log("Not in an embedded iFrame. This is a Dev Mistake.", "🔴");
     }
   }
-  private setAmount(amount: string) {
+  // Set the donation amount on the form. The amount field can be any input
+  // type (radio buttons with an "other" free-text option, a select, or a
+  // plain input), so the applied value is verified by re-reading the field.
+  // Returns false when the amount cannot be applied, in which case the
+  // caller must exit rather than submit a different amount than the donor
+  // chose.
+  private setAmount(amount: string): boolean {
+    const otherField = document.querySelector(
+      'input[name="transaction.donationAmt.other"]'
+    ) as HTMLInputElement | null;
     // Run only if it is a Donation Page with a Donation Amount field
-    if (!document.getElementsByName("transaction.donationAmt").length) {
-      return;
+    if (
+      !document.getElementsByName("transaction.donationAmt").length &&
+      !otherField
+    ) {
+      this.log("No donation amount field found on the page", "🔴");
+      return false;
     }
     const feeCover = this.ENgrid.getField(
       "transaction.feeCover"
@@ -1457,36 +1485,64 @@ export class Regive {
         amount = (parseFloat(amount) - feeCoverAmount).toFixed(2);
       }
     }
-    // Search for the current amount on radio boxes
-    let found = Array.from(
-      document.querySelectorAll('input[name="transaction.donationAmt"]')
-    ).filter(
-      (el) =>
-        el instanceof HTMLInputElement &&
-        parseFloat(el.value) == parseFloat(amount)
-    );
-    // We found the amount on the radio boxes, so check it
-    const otherField = document.querySelector(
-      'input[name="transaction.donationAmt.other"]'
-    ) as HTMLInputElement;
-    if (found.length) {
-      const amountField = found[0] as HTMLInputElement;
-      amountField.checked = true;
-      // Other amount field value can be set to a previous value with chain links, so we need to clear it to avoid overlapping values
-      if (otherField) {
-        otherField.value = "";
+    const target = parseFloat(amount);
+    if (isNaN(target) || target <= 0) {
+      this.log(`Cannot apply invalid donation amount "${amount}"`, "🔴");
+      return false;
+    }
+    // The "other" free-text amount takes precedence over the main field, so
+    // start from a clean slate, then apply the amount to the main field
+    // (setFieldValue handles radio, select, text and hidden fields)
+    if (otherField) {
+      otherField.value = "";
+    }
+    this.ENgrid.setFieldValue("transaction.donationAmt", target.toString());
+    if (
+      parseFloat(this.ENgrid.getFieldValue("transaction.donationAmt")) !==
+      target
+    ) {
+      // No preset option matched. Fall back to the "other" free-text
+      // amount, but only when the main field is a radio group (EN's
+      // withOther pattern) or absent entirely. On a select or plain input
+      // the stale value cannot be cleared, so submitting would send two
+      // conflicting amounts.
+      const amountFields = document.querySelectorAll(
+        '[name="transaction.donationAmt"]'
+      );
+      const hasRadios = Array.from(amountFields).some(
+        (el) => el instanceof HTMLInputElement && el.type === "radio"
+      );
+      if (!otherField || (amountFields.length && !hasRadios)) {
+        this.log(
+          `Could not set the donation amount to ${target} - the field reads "${this.ENgrid.getFieldValue(
+            "transaction.donationAmt"
+          )}"`,
+          "🔴"
+        );
+        return false;
       }
-    } else if (otherField) {
       const enFieldOtherAmountRadio = document.querySelector(
         `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
       ) as HTMLInputElement;
       if (enFieldOtherAmountRadio) {
         enFieldOtherAmountRadio.checked = true;
       }
-      otherField.value = parseFloat(amount.toString()).toFixed(2);
-    } else {
-      this.log("Could not find a way to set the amount field", "🔴");
+      otherField.value = target.toFixed(2);
+      if (
+        parseFloat(
+          this.ENgrid.getFieldValue("transaction.donationAmt.other")
+        ) !== target
+      ) {
+        this.log(
+          `Could not set the donation amount to ${target} - the "other" field reads "${this.ENgrid.getFieldValue(
+            "transaction.donationAmt.other"
+          )}"`,
+          "🔴"
+        );
+        return false;
+      }
     }
+    return true;
   }
   private submitForm(amount: string) {
     this.log("Submitting form with amount", "💰", { amount });
@@ -1522,7 +1578,14 @@ export class Regive {
       // EN has a bug where the embedded form will FORCE the use of the feeCover if the parent donation form was set to cover fees
       // No matter what the user selects on the regive form
       // So we need to set the amount to a lower amount to consider the fees in case the user selected to cover fees
-      this.setAmount(amount);
+      if (!this.setAmount(amount)) {
+        this.log(
+          "Not submitting form because the amount could not be applied",
+          "🔴"
+        );
+        this.exit();
+        return;
+      }
       localStorage.setItem(
         "regive-submitted",
         this.ENgrid.getPageID().toString()
@@ -1723,81 +1786,88 @@ export class Regive {
         );
     }
   }
-  private setFrequency() {
+  // Write a field value, creating the field as a hidden input if it does not
+  // exist, and verify the write by re-reading the field. Returns false when
+  // the value did not stick (e.g. a select or radio group with no matching
+  // option).
+  private applyFieldValue(name: string, value: string): boolean {
+    if (this.ENgrid.getField(name)) {
+      this.ENgrid.setFieldValue(name, value);
+    } else {
+      this.ENgrid.createHiddenInput(name, value);
+    }
+    return this.ENgrid.getFieldValue(name) === value;
+  }
+
+  // Set the configured donation frequency on the form. The recurrpay and
+  // recurrfreq fields can be any input type (radio, select, checkbox,
+  // hidden, text), so every write is verified by re-reading the field
+  // instead of assuming the write worked. Returns false when the configured
+  // frequency cannot be applied on this page, in which case the caller must
+  // exit rather than submit with a different frequency than configured.
+  private setFrequency(): boolean {
     const frequency = (this.options?.frequency || "onetime")
       .trim()
       .toUpperCase();
     const recurringFrequencies = ["MONTHLY", "QUARTERLY", "ANNUAL"];
-    if (!recurringFrequencies.includes(frequency)) {
-      if (frequency !== "ONETIME") {
-        this.log(
-          `Unknown frequency "${this.options?.frequency}", falling back to one-time`,
-          "⚠️"
-        );
+    if (!recurringFrequencies.includes(frequency) && frequency !== "ONETIME") {
+      this.log(
+        `Unknown frequency "${this.options?.frequency}" - refusing to submit with a different frequency than configured`,
+        "🔴"
+      );
+      return false;
+    }
+    const recurrpayField = this.ENgrid.getField("transaction.recurrpay");
+    if (frequency === "ONETIME") {
+      // recurrpay governs one-time giving: any final value other than "Y"
+      // is acceptable
+      if (recurrpayField) {
+        if (
+          recurrpayField instanceof HTMLInputElement &&
+          recurrpayField.type === "checkbox"
+        ) {
+          // setFieldValue can only check boxes, never uncheck them
+          recurrpayField.checked = false;
+        } else {
+          // "N" covers radios and N-valued selects, "" covers hidden/text
+          this.ENgrid.setFieldValue("transaction.recurrpay", "N");
+          if (this.ENgrid.getFieldValue("transaction.recurrpay") !== "N") {
+            this.ENgrid.setFieldValue("transaction.recurrpay", "");
+          }
+        }
+        if (this.ENgrid.getFieldValue("transaction.recurrpay") === "Y") {
+          this.log(
+            'Could not set recurrpay to a non-"Y" value - cannot make a one-time donation on this page',
+            "🔴"
+          );
+          return false;
+        }
       }
       this.ENgrid.setFieldValue("transaction.recurrfreq", "ONETIME");
-      const recurrpayField = this.ENgrid.getField("transaction.recurrpay");
-      if (
-        recurrpayField &&
-        recurrpayField instanceof HTMLInputElement &&
-        recurrpayField.type === "radio"
-      ) {
-        // When it's a radio box, check the option with value="N"
-        const radioOptions = document.querySelectorAll(
-          'input[name="transaction.recurrpay"]'
-        ) as NodeListOf<HTMLInputElement>;
-        radioOptions.forEach((radio) => {
-          if (radio.value === "N") {
-            radio.checked = true;
-            this.log("Set recurrpay radio to N", "💾");
-          }
-        });
-      } else {
-        // When it's a hidden field, set the value to empty
-        this.ENgrid.setFieldValue("transaction.recurrpay", "");
-      }
       this.log("Set one-time frequency", "💾");
-      return;
+      return true;
     }
     // Recurring donation: set recurrpay=Y and recurrfreq to the chosen frequency.
     // transaction.recurrday is left untouched - EN defaults it to the current day.
-    const recurrpayField = this.ENgrid.getField("transaction.recurrpay");
-    if (
-      recurrpayField &&
-      recurrpayField instanceof HTMLInputElement &&
-      recurrpayField.type === "radio"
-    ) {
-      const radioOptions = document.querySelectorAll(
-        'input[name="transaction.recurrpay"]'
-      ) as NodeListOf<HTMLInputElement>;
-      let foundYes = false;
-      radioOptions.forEach((radio) => {
-        if (radio.value === "Y") {
-          radio.checked = true;
-          foundYes = true;
-          this.log("Set recurrpay radio to Y", "💾");
-        }
-      });
-      if (!foundYes) {
-        this.log(
-          'No recurrpay radio option with value="Y" found - the donation will be one-time',
-          "⚠️"
-        );
-      }
-    } else if (recurrpayField) {
-      this.ENgrid.setFieldValue("transaction.recurrpay", "Y");
-    } else {
-      this.ENgrid.createHiddenInput("transaction.recurrpay", "Y");
+    if (!this.applyFieldValue("transaction.recurrpay", "Y")) {
+      this.log(
+        'Could not set recurrpay to "Y" - cannot make a recurring donation on this page',
+        "🔴"
+      );
+      return false;
     }
-    if (this.ENgrid.getField("transaction.recurrfreq")) {
-      this.ENgrid.setFieldValue("transaction.recurrfreq", frequency);
-    } else {
-      this.ENgrid.createHiddenInput("transaction.recurrfreq", frequency);
+    if (!this.applyFieldValue("transaction.recurrfreq", frequency)) {
+      this.log(
+        `Could not set recurrfreq to "${frequency}" - cannot make a ${frequency.toLowerCase()} donation on this page`,
+        "🔴"
+      );
+      return false;
     }
     this.log("Set recurring frequency", "💾", {
       recurrpay: "Y",
       recurrfreq: frequency,
     });
+    return true;
   }
 
   // Exit the Regive Process

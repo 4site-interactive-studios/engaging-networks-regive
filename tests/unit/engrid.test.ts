@@ -220,6 +220,58 @@ describe("getFieldValue / setFieldValue", () => {
     `);
     expect(ENGrid.getFieldValue("supporter.topics")).toBe("a,b");
   });
+
+  it("matches select options numerically (e.g. 10 matches 10.00)", () => {
+    enForm(`
+      <select name="transaction.donationAmt">
+        <option value="5.00">$5</option>
+        <option value="10.00">$10</option>
+      </select>
+    `);
+    ENGrid.setFieldValue("transaction.donationAmt", "10");
+    const select = ENGrid.getField(
+      "transaction.donationAmt"
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("10.00");
+  });
+
+  it("does not match a numerically different option", () => {
+    enForm(`
+      <select name="transaction.donationAmt">
+        <option value="10.5">$10.50</option>
+      </select>
+    `);
+    ENGrid.setFieldValue("transaction.donationAmt", "10");
+    const select = ENGrid.getField(
+      "transaction.donationAmt"
+    ) as HTMLSelectElement;
+    expect(select.value).not.toBe("10");
+    expect(ENGrid.getFieldValue("transaction.donationAmt")).toBe("10.5");
+  });
+
+  it("matches radio inputs numerically", () => {
+    enForm(`
+      <input type="radio" name="transaction.donationAmt" value="5.00">
+      <input type="radio" name="transaction.donationAmt" value="10.00">
+    `);
+    ENGrid.setFieldValue("transaction.donationAmt", "10");
+    const radio = document.querySelector(
+      'input[name="transaction.donationAmt"][value="10.00"]'
+    ) as HTMLInputElement;
+    expect(radio.checked).toBe(true);
+  });
+
+  it("does not numerically match non-numeric values", () => {
+    enForm(`
+      <input type="radio" name="transaction.recurrpay" value="N">
+      <input type="radio" name="transaction.recurrpay" value="Y">
+    `);
+    ENGrid.setFieldValue("transaction.recurrpay", "Y");
+    expect(ENGrid.getFieldValue("transaction.recurrpay")).toBe("Y");
+    ENGrid.setFieldValue("transaction.recurrpay", "");
+    // "" is not numeric, so nothing gets checked
+    expect(ENGrid.getFieldValue("transaction.recurrpay")).toBe("Y");
+  });
 });
 
 describe("body data attributes", () => {
