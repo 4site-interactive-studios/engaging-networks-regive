@@ -45,6 +45,13 @@
         <input type="radio" name="transaction.donationAmt" value="5" />
         <input type="radio" name="transaction.donationAmt" value="10" />
         <input type="text" name="transaction.donationAmt.other" value="" />
+        <input type="radio" name="transaction.recurrpay" value="N" checked />
+        <input type="radio" name="transaction.recurrpay" value="Y" />
+        <select name="transaction.recurrfreq">
+          <option value="ONETIME">One-time</option>
+          <option value="MONTHLY">Monthly</option>
+          <option value="ANNUAL">Annual</option>
+        </select>
       </div>
       <div class="en__component en__submit">
         <button type="submit">Donate</button>

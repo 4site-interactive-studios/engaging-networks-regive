@@ -24,6 +24,8 @@ const routes = [
   { pattern: /^\/page\/\d+\/donate\/2$/, file: "fixtures/page-2.html" },
   // Thank-you page with the <regive source="original"> tag
   { pattern: /^\/page\/\d+\/original\/2$/, file: "fixtures/page-2-original.html" },
+  // Thank-you page with the <regive hide-for-frequency="annual,monthly"> tag
+  { pattern: /^\/page\/\d+\/frequency\/2$/, file: "fixtures/page-2-frequency.html" },
   // Thank-you page with the <regive test="true"> tag
   { pattern: /^\/page\/\d+\/test\/2$/, file: "fixtures/page-2-test.html" },
 ];

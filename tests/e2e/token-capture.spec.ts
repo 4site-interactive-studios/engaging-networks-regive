@@ -32,4 +32,27 @@ test("captures VGS token fields into localStorage", async ({ page }) => {
   await expect.poll(() => getStored(page, "regive-appealcode")).toBe(
     "SPRING25"
   );
+  // The fixture's default is a one-time gift (recurrpay=N is checked)
+  await expect.poll(() => getStored(page, "regive-frequency")).toBe("onetime");
+});
+
+test("captures the original gift's frequency into localStorage", async ({
+  page,
+}) => {
+  await page.goto("/page/12345/donate/1");
+
+  // The donor switches to a monthly recurring gift
+  await page.locator('input[name="transaction.recurrpay"][value="Y"]').check();
+  await page
+    .locator('select[name="transaction.recurrfreq"]')
+    .selectOption("MONTHLY");
+
+  // Simulate VGS writing a token, which triggers the mutation observer
+  await page.evaluate(() => {
+    document
+      .querySelector('input[name="transaction.ccnumber"]')
+      ?.setAttribute("value", "tok_cc_123");
+  });
+
+  await expect.poll(() => getStored(page, "regive-frequency")).toBe("monthly");
 });

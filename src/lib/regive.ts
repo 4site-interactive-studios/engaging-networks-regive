@@ -944,6 +944,7 @@ export class Regive {
     localStorage.removeItem("regive-paymenttype");
     localStorage.removeItem("regive-dw-paymenttype");
     localStorage.removeItem("regive-appealcode");
+    localStorage.removeItem("regive-frequency");
   }
 
   private appendToUrl(url: string, params: string): string {
@@ -959,6 +960,23 @@ export class Regive {
   private replaceRegiveTagWithIframe() {
     const regiveTags = document.querySelectorAll("regive");
     regiveTags.forEach((regiveTag) => {
+      // Skip regive when the original gift's frequency is in the tag's
+      // hide-for-frequency list (e.g. don't offer a second annual gift)
+      const hideForFrequency = regiveTag.getAttribute("hide-for-frequency");
+      if (hideForFrequency) {
+        const hiddenFrequencies = hideForFrequency
+          .split(",")
+          .map((frequency) => frequency.trim().toLowerCase())
+          .filter((frequency) => frequency !== "");
+        const originalFrequency = localStorage.getItem("regive-frequency");
+        if (originalFrequency && hiddenFrequencies.includes(originalFrequency)) {
+          this.log(
+            `Not loading Regive: original gift frequency "${originalFrequency}" matches hide-for-frequency "${hideForFrequency}"`,
+            "⚠️"
+          );
+          return;
+        }
+      }
       this.log("Replacing <regive> tag with an iframe");
 
       // Get options from the regive tag
@@ -1088,6 +1106,29 @@ export class Regive {
       return false;
     };
 
+    // Derive the original gift's frequency from the recurrpay/recurrfreq
+    // fields and store it. A gift is recurring only when recurrpay is "Y".
+    const saveFrequencyToStorage = () => {
+      const recurrpay = this.ENgrid.getFieldValue("transaction.recurrpay")
+        .trim()
+        .toUpperCase();
+      let frequency = "onetime";
+      if (recurrpay === "Y") {
+        const recurrfreq = this.ENgrid.getFieldValue("transaction.recurrfreq")
+          .trim()
+          .toUpperCase();
+        if (["MONTHLY", "QUARTERLY", "ANNUAL"].includes(recurrfreq)) {
+          frequency = recurrfreq.toLowerCase();
+        }
+      }
+      if (frequency !== localStorage.getItem("regive-frequency")) {
+        this.log("Saving original gift frequency to localStorage", "💾", {
+          frequency,
+        });
+        localStorage.setItem("regive-frequency", frequency);
+      }
+    };
+
     // Create mutation observer
     this._observer = new MutationObserver(() => {
       // Check all our target fields on any DOM change
@@ -1102,6 +1143,7 @@ export class Regive {
       saveFieldToStorage("transaction.ccexpire", "regive-exp");
       saveFieldToStorage("transaction.vgs.cardType", "regive-card");
       saveFieldToStorage("supporter.appealCode", "regive-appealcode");
+      saveFrequencyToStorage();
     });
 
     // On non-engrid pages, we need to listen for submissions rather than watching for the payment type to change
@@ -1121,6 +1163,8 @@ export class Regive {
         subtree: true,
         characterData: true,
       });
+      // Capture the frequency right away in case the form never mutates
+      saveFrequencyToStorage();
     } else {
       this.log("Donation form not found for observation", "🔴");
     }

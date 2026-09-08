@@ -55,4 +55,7 @@ export interface RegiveOptions {
 
   /** Donation frequency for the regive donation: "onetime" (default), "monthly", "quarterly", or "annual". Recurring day defaults to the current day. */
   frequency?: string;
+
+  /** Comma-separated list of original gift frequencies for which regive should not be shown (e.g. "annual,monthly") */
+  hideForFrequency?: string;
 }

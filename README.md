@@ -110,6 +110,7 @@ Available themes:
 | `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
 | `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"` | `null` |
 | `frequency` | Donation frequency: `onetime`, `monthly`, `quarterly`, or `annual`. The recurring day defaults to the current day. Recurring donations via digital wallets depend on gateway support | `frequency="monthly"` | `"onetime"` |
+| `hide-for-frequency` | Comma-separated list of original gift frequencies for which regive should not be shown. The original gift's frequency is captured on page 1 | `hide-for-frequency="annual,monthly"` | `null` |
 
 #### Base Page Option
 
