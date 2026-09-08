@@ -21,6 +21,7 @@ test("captures VGS token fields into localStorage", async ({ page }) => {
     set("transaction.ccvv", "tok_cv_456");
     set("transaction.ccexpire", "0130");
     set("transaction.vgs.cardType", "visa");
+    set("supporter.appealCode", "SPRING25");
   });
 
   await expect.poll(() => getStored(page, "regive-num")).toBe("tok_cc_123");
@@ -28,4 +29,7 @@ test("captures VGS token fields into localStorage", async ({ page }) => {
   await expect.poll(() => getStored(page, "regive-exp")).toBe("0130");
   await expect.poll(() => getStored(page, "regive-card")).toBe("visa");
   await expect.poll(() => getStored(page, "regive-paymenttype")).toBe("card");
+  await expect.poll(() => getStored(page, "regive-appealcode")).toBe(
+    "SPRING25"
+  );
 });

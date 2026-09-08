@@ -75,7 +75,7 @@ The Regive component can be customized using various attributes on the `<regive>
 | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | -------------- |
 | `heading`           | Message displayed above the donation buttons                 | `heading="Double your impact today!"`                        | `null`         |
 | `thank-you-message` | Message shown after successful donation                      | `thank-you-message="Thank you for your additional support!"` | `"Thank You!"` |
-| `source`            | Source code for the donation (saved in supporter.appealCode) | `source="REGIVE-CHRISTMAS"`                                  | `"REGIVE"`     |
+| `source`            | Source code for the donation (saved in supporter.appealCode). Set to `original` to reuse the appeal code from the original gift | `source="REGIVE-CHRISTMAS"` or `source="original"` | `"REGIVE"`     |
 
 ### Visual Styling
 

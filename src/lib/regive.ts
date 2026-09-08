@@ -710,8 +710,27 @@ export class Regive {
     }
   }
 
+  private resolveAppealCode(): string {
+    const source = this.options?.source?.trim() || "REGIVE";
+    if (source.toLowerCase() !== "original") {
+      return source;
+    }
+    const original = localStorage.getItem("regive-appealcode");
+    if (original) {
+      this.log("Using the original donation's appeal code", "💾", {
+        original,
+      });
+      return original;
+    }
+    this.log(
+      'source="original" but no original appeal code was captured. Falling back to "REGIVE"',
+      "⚠️"
+    );
+    return "REGIVE";
+  }
+
   private writeHiddenFields(paymentMethod: string) {
-    const source = this.options?.source || "REGIVE";
+    const source = this.resolveAppealCode();
     const sourceField = this.ENgrid.getField(
       "supporter.appealCode"
     ) as HTMLInputElement;
@@ -750,7 +769,7 @@ export class Regive {
   }
 
   private writeHiddenCardFields(paymentMethod: string) {
-    const source = this.options?.source || "REGIVE";
+    const source = this.resolveAppealCode();
     const tokens = this.getVgsTokens();
     const expField = this.ENgrid.getField(
       "transaction.ccexpire"
@@ -924,6 +943,7 @@ export class Regive {
     localStorage.removeItem("regive-height");
     localStorage.removeItem("regive-paymenttype");
     localStorage.removeItem("regive-dw-paymenttype");
+    localStorage.removeItem("regive-appealcode");
   }
 
   private appendToUrl(url: string, params: string): string {
@@ -1081,6 +1101,7 @@ export class Regive {
       saveFieldToStorage("transaction.ccvv", "regive-ver");
       saveFieldToStorage("transaction.ccexpire", "regive-exp");
       saveFieldToStorage("transaction.vgs.cardType", "regive-card");
+      saveFieldToStorage("supporter.appealCode", "regive-appealcode");
     });
 
     // On non-engrid pages, we need to listen for submissions rather than watching for the payment type to change
