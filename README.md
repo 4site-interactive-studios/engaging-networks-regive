@@ -190,15 +190,18 @@ You can create custom themes by:
 
 The following merge tags can be used in custom templates:
 
-| Merge Tag              | Description                  |
-| ---------------------- | ---------------------------- |
-| `{{heading}}`          | Inserts the heading content  |
-| `{{button}}`           | Inserts the donation buttons |
-| `{{theme}}`            | The current theme name       |
-| `{{bg-color}}`         | The background color         |
-| `{{txt-color}}`        | The text color               |
-| `{{button-bg-color}}`  | The button background color  |
-| `{{button-txt-color}}` | The button text color        |
+| Merge Tag              | Description                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `{{heading}}`          | Inserts the heading content                                                                               |
+| `{{button}}`           | Inserts the donation buttons                                                                              |
+| `{{ask-amount}}`       | The first (or only) amount button's value, formatted in USD (e.g. `$5`, `$5.01`, `$1,250`)                |
+| `{{theme}}`            | The current theme name                                                                                    |
+| `{{bg-color}}`         | The background color                                                                                      |
+| `{{txt-color}}`        | The text color                                                                                            |
+| `{{button-bg-color}}`  | The button background color                                                                               |
+| `{{button-txt-color}}` | The button text color                                                                                     |
+
+`{{ask-amount}}` is replaced everywhere in the template, including inside `<style>` blocks and CSS pseudo-element `content` values.
 
 Additionally, the `{{amount}}` merge tag can be used in the `button-label` attribute to include the donation amount in the button text.
 

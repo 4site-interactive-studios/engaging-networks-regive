@@ -298,6 +298,9 @@ export class Regive {
     const hasCaptcha = this.hasCaptcha();
 
     const amounts = this.options?.amount?.split(",") || ["5"];
+    // Value of the first (or only) amount button, formatted as USD for the
+    // {{ask-amount}} merge tag
+    const askAmount = this.formatAskAmount(amounts[0]);
     const labels: string[] = [];
     const bgColor = this.options?.bgColor || "#FFF";
     const txtColor = this.options?.txtColor || "#333";
@@ -450,6 +453,9 @@ export class Regive {
         /{{heading}}/g,
         heading ? `<h1 class="regive-heading">${heading}</h1>` : ""
       );
+      // Global string replace so {{ask-amount}} works anywhere in the
+      // template, including <style> blocks and pseudo-element content
+      template = template.replace(/{{ask-amount}}/g, askAmount);
       template = template.replace(/{{theme}}/g, theme ? theme : "");
       template = template.replace(/{{bg-color}}/g, bgColor ? bgColor : "");
       template = template.replace(/{{txt-color}}/g, txtColor ? txtColor : "");
@@ -1298,6 +1304,22 @@ export class Regive {
   private parseAmount(value: string | null | undefined): number {
     if (!value || /[{}]|%7b|%7d/i.test(value)) return NaN;
     return parseFloat(value.replace(/[^0-9.]/g, ""));
+  }
+
+  // Format an amount button value as USD for the {{ask-amount}} merge tag:
+  // "$5", "$5.01", "$1,250" — cents are included only when non-zero.
+  // Falls back to the raw trimmed string if the amount isn't numeric.
+  private formatAskAmount(amount: string | undefined): string {
+    const raw = (amount ?? "").trim();
+    const value = this.parseAmount(raw);
+    if (isNaN(value)) return raw;
+    const hasCents = Math.round(value * 100) % 100 !== 0;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: hasCents ? 2 : 0,
+      maximumFractionDigits: 2,
+    }).format(value);
   }
 
   private processAmounts(options: RegiveOptions) {

@@ -52,7 +52,7 @@ HTML attributes on `<regive>` tag > URL parameters > JavaScript defaults. Attrib
 
 ### Theme System
 
-Built-in themes: `stacked`, `button-right`, `button-left`, `button-top`. Custom themes are defined as `<template>` elements whose `id` matches the theme name. Merge tags (`{{heading}}`, `{{button}}`, `{{amount}}`, and color CSS variables) are replaced at render time.
+Built-in themes: `stacked`, `button-right`, `button-left`, `button-top`. Custom themes are defined as `<template>` elements whose `id` matches the theme name. Merge tags (`{{heading}}`, `{{button}}`, `{{ask-amount}}`, `{{amount}}`, and color CSS variables) are replaced at render time. `{{ask-amount}}` resolves to the first (or only) amount button's value formatted in USD (`$5`, `$5.01`, `$1,250` — cents only when non-zero) via `formatAskAmount`, and is replaced on the raw template string so it also works inside `<style>` blocks and pseudo-element `content` values.
 
 ### Amount Processing
 
