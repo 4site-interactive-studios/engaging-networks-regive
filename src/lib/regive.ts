@@ -4,6 +4,9 @@ import "./confetti";
 
 const digitalWalletMethods = ["applepay", "googlepay", "stripedigitalwallet"]; // currently unsupported: "paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch", "daf"
 const cardMethods = ["card", "cards", "VI", "MC", "DS", "AX"];
+// Sanity ceiling for the gift amount - guards against garbage input (e.g. an
+// encoded merge tag leaking through) resolving to an absurd ask
+const maxGiftAmount = 100000;
 
 export class Regive {
   private readonly ENgrid = ENGrid;
@@ -1288,27 +1291,48 @@ export class Regive {
     this.log("Loaded options from URL", "ℹ️", this.options);
   }
 
-  // Parse a numeric amount, rejecting unresolved merge tags and stripping
-  // currency formatting (e.g. "$1,250.00" -> 1250). Shared by processAmounts
-  // and getTheme so gift amounts are interpreted consistently everywhere.
+  // Parse a numeric amount, rejecting unresolved merge tags (including
+  // URL-encoded braces) and stripping currency formatting
+  // (e.g. "$1,250.00" -> 1250). Shared by processAmounts and getTheme so gift
+  // amounts are interpreted consistently everywhere.
   private parseAmount(value: string | null | undefined): number {
-    return !value || value.includes("{")
-      ? NaN
-      : parseFloat(value.replace(/[^0-9.]/g, ""));
+    if (!value || /[{}]|%7b|%7d/i.test(value)) return NaN;
+    return parseFloat(value.replace(/[^0-9.]/g, ""));
   }
 
   private processAmounts(options: RegiveOptions) {
     // Get the user's gift amount, falling back to the value stored on the donation page.
     // This runs even without an amount attribute so theme rules get a normalized number.
     let giftAmount = this.parseAmount(options.giftAmount);
+    let giftSource = "the gift-amount attribute";
     if (isNaN(giftAmount)) {
-      giftAmount = this.parseAmount(localStorage.getItem("regive-donation-amt"));
+      giftAmount = this.parseAmount(
+        localStorage.getItem("regive-donation-amt")
+      );
+      giftSource = "the stored donation amount";
+    }
+    if (!isNaN(giftAmount) && giftAmount > maxGiftAmount) {
+      this.log(
+        `Gift amount (${giftAmount}) exceeds the sanity ceiling (${maxGiftAmount}) and will be ignored`,
+        "⚠️"
+      );
+      giftAmount = NaN;
     }
     const giftUnavailable = isNaN(giftAmount) || giftAmount <= 0;
     if (!giftUnavailable) {
+      this.log(
+        `Gift amount resolved to ${giftAmount} from ${giftSource}`,
+        "ℹ️"
+      );
       options.giftAmount = giftAmount.toString();
+    } else {
+      this.log("Gift amount could not be determined", "⚠️");
     }
-    if (!options.amount) return;
+    // No amount configured (or an empty value) - clear it so the default is used downstream
+    if (!options.amount?.trim()) {
+      delete options.amount;
+      return;
+    }
 
     // Get the minimum and maximum guardrails, if applicable
     const parsedMin = this.parseAmount(options.minAmount);
@@ -1379,6 +1403,9 @@ export class Regive {
         }
         // Resolve, clamp, round, then clamp again so a round-up cannot exceed the maximum
         value = Math.max(minAmount, (giftAmount * percentage) / 100);
+        // Round to cents first so floating-point dust can't push the value
+        // a hair past an exact rounding-tier step and jump a full increment
+        value = Math.round(value * 100) / 100;
         const increment = applicableTier ? applicableTier.increment : 1;
         const roundedUp = Math.ceil(value / increment) * increment;
         if (maxAmount !== undefined && roundedUp > maxAmount) {
@@ -1392,6 +1419,8 @@ export class Regive {
           minAmount,
           maxAmount !== undefined ? Math.min(value, maxAmount) : value
         );
+        // Guard against floating-point dust from the increment math
+        value = Math.round(value * 100) / 100;
         if (fixedValues.has(value) || resolvedPercentages.has(value)) {
           this.log(
             `Skipping duplicate amount: ${token} resolves to ${value}, which is already in the list`,
@@ -1408,6 +1437,15 @@ export class Regive {
       }
     }
     options.amount = resolved.join(",");
+    if (!options.amount) {
+      // Every token was skipped - clear the amount so the default is used downstream
+      // instead of rendering a broken button with an empty amount
+      this.log(
+        "No valid amounts after processing. Falling back to the default amount",
+        "⚠️"
+      );
+      delete options.amount;
+    }
   }
 
   // Send an action to the parent window

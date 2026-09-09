@@ -137,6 +137,10 @@ By default, Regive processes the additional donation through the same page as th
 
 The values for min and max amounts only apply to percentage/dynamic amounts.
 
+#### Gift Amount Format
+
+The `gift-amount` attribute and the amounts (`min-amount`, `max-amount`, `rounding-tiers`) expect US-style number formatting (e.g. `gift-amount="$1,250.00"`). European-style formats (e.g. `€1.250,00`) are not currently supported - a value like that will not parse as intended.
+
 #### Rounding tiers
 
 Rounding tiers are groups of amounts and rounding rules for percentage gifts. Each tier is defined by a minimum amount and the rounding increment. For example, `rounding-tiers="0:1,50:5"` means that amounts from 0 to 49 will be rounded up, and amounts from 50 onwards will be rounded up to the next $5 increment. The tiers are calculated based on gift amount, not calculated amounts.
