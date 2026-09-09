@@ -139,7 +139,7 @@ The values for min and max amounts only apply to percentage/dynamic amounts.
 
 #### Rounding tiers
 
-Rounding tiers are groups of amounts and rounding rules for percentage gifts. Each tier is defined by a minimum amount and the rounding increment. For example, `rounding-tiers="0:1,50:5"` means that amounts from 0 to 49 will be rounded to the nearest 1, and amounts from 50 onwards will be rounded to the nearest 5. The tiers are calculated based on gift amount, not calculated amounts.
+Rounding tiers are groups of amounts and rounding rules for percentage gifts. Each tier is defined by a minimum amount and the rounding increment. For example, `rounding-tiers="0:1,50:5"` means that amounts from 0 to 49 will be rounded up, and amounts from 50 onwards will be rounded up to the next $5 increment. The tiers are calculated based on gift amount, not calculated amounts.
 
 ## Custom Theming
 

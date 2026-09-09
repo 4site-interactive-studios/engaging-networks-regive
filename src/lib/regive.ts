@@ -449,10 +449,7 @@ export class Regive {
       );
       template = template.replace(/{{theme}}/g, theme ? theme : "");
       template = template.replace(/{{bg-color}}/g, bgColor ? bgColor : "");
-      template = template.replace(
-        /{{txt-color}}/g,
-        txtColor ? txtColor : ""
-      );
+      template = template.replace(/{{txt-color}}/g, txtColor ? txtColor : "");
       template = template.replace(
         /{{button-bg-color}}/g,
         buttonBgColor ? buttonBgColor : ""
@@ -641,22 +638,35 @@ export class Regive {
   // string. This runs before the theme lookup, which handles built-in themes,
   // custom <template> themes, and fallbacks.
   private getTheme(options: RegiveOptions) {
-    const giftAmount = parseFloat(options.giftAmount ?? "0");
+    // options.giftAmount is already normalized by processAmounts (including the
+    // localStorage fallback), but parse it with the shared parser anyway in case
+    // this is ever called with unprocessed options.
+    const giftAmount = this.parseAmount(options.giftAmount);
     let selectedTheme = options.theme ?? "stacked";
     // Only apply theme rules if a positive gift amount is specified. In case we have a special theme for smaller amounts, it will be ignored if the gift amount is zero (implied unknown).
     let currentThreshold = -1;
-    if (options.themeRules && giftAmount > 0) {
-      const rules = options.themeRules.split(",");
-      for (const rule of rules) {
-        const [thresholdStr, theme] = rule.split(":").map((s) => s.trim());
-        const threshold = parseFloat(thresholdStr);
-        if (isNaN(threshold) || !theme) {
-          this.log(`Invalid theme rule: "${rule}". Skipping this rule.`, "⚠️");
-          continue;
-        }
-        if (giftAmount >= threshold && threshold > currentThreshold) {
-          currentThreshold = threshold;
-          selectedTheme = theme;
+    if (options.themeRules) {
+      if (isNaN(giftAmount) || giftAmount <= 0) {
+        this.log(
+          "Theme rules are set but the gift amount is unavailable. Theme rules will be ignored.",
+          "⚠️"
+        );
+      } else {
+        const rules = options.themeRules.split(",");
+        for (const rule of rules) {
+          const [thresholdStr, theme] = rule.split(":").map((s) => s.trim());
+          const threshold = parseFloat(thresholdStr);
+          if (isNaN(threshold) || !theme) {
+            this.log(
+              `Invalid theme rule: "${rule}". Skipping this rule.`,
+              "⚠️"
+            );
+            continue;
+          }
+          if (giftAmount >= threshold && threshold > currentThreshold) {
+            currentThreshold = threshold;
+            selectedTheme = theme;
+          }
         }
       }
     }
@@ -967,6 +977,7 @@ export class Regive {
     localStorage.removeItem("regive-height");
     localStorage.removeItem("regive-paymenttype");
     localStorage.removeItem("regive-dw-paymenttype");
+    localStorage.removeItem("regive-donation-amt");
   }
 
   private appendToUrl(url: string, params: string): string {
@@ -1277,25 +1288,33 @@ export class Regive {
     this.log("Loaded options from URL", "ℹ️", this.options);
   }
 
-  private processAmounts(options: RegiveOptions) {
-    if (!options.amount) return;
-    // Parse a numeric amount, rejecting unresolved merge tags and stripping currency formatting
-    const parseAmount = (value: string | null | undefined): number =>
-      !value || value.includes("{")
-        ? NaN
-        : parseFloat(value.replace(/[^0-9.]/g, ""));
+  // Parse a numeric amount, rejecting unresolved merge tags and stripping
+  // currency formatting (e.g. "$1,250.00" -> 1250). Shared by processAmounts
+  // and getTheme so gift amounts are interpreted consistently everywhere.
+  private parseAmount(value: string | null | undefined): number {
+    return !value || value.includes("{")
+      ? NaN
+      : parseFloat(value.replace(/[^0-9.]/g, ""));
+  }
 
-    // Get the user's gift amount, falling back to the value stored on the donation page
-    let giftAmount = parseAmount(options.giftAmount);
+  private processAmounts(options: RegiveOptions) {
+    // Get the user's gift amount, falling back to the value stored on the donation page.
+    // This runs even without an amount attribute so theme rules get a normalized number.
+    let giftAmount = this.parseAmount(options.giftAmount);
     if (isNaN(giftAmount)) {
-      giftAmount = parseAmount(localStorage.getItem("regive-donation-amt"));
+      giftAmount = this.parseAmount(localStorage.getItem("regive-donation-amt"));
     }
+    const giftUnavailable = isNaN(giftAmount) || giftAmount <= 0;
+    if (!giftUnavailable) {
+      options.giftAmount = giftAmount.toString();
+    }
+    if (!options.amount) return;
 
     // Get the minimum and maximum guardrails, if applicable
-    const parsedMin = parseAmount(options.minAmount);
+    const parsedMin = this.parseAmount(options.minAmount);
     const hasMinAmount = !isNaN(parsedMin) && parsedMin > 0;
     const minAmount = hasMinAmount ? parsedMin : 1;
-    let maxAmount: number | undefined = parseAmount(options.maxAmount);
+    let maxAmount: number | undefined = this.parseAmount(options.maxAmount);
     if (isNaN(maxAmount)) maxAmount = undefined;
     if (maxAmount !== undefined && minAmount > maxAmount) {
       this.log(
@@ -1304,7 +1323,6 @@ export class Regive {
       );
       maxAmount = undefined;
     }
-    const giftUnavailable = isNaN(giftAmount) || giftAmount <= 0;
     if (giftUnavailable) {
       if (hasMinAmount) {
         this.log(
@@ -1318,8 +1336,6 @@ export class Regive {
           "⚠️"
         );
       }
-    } else {
-      options.giftAmount = giftAmount.toString();
     }
     // Get the rounding tiers, if applicable
     const roundingTiers = options.roundingTiers || "0:1,50:5";
@@ -1335,8 +1351,21 @@ export class Regive {
     const applicableTier = processedRoundingTiers
       .filter((tier) => giftAmount >= tier.min)
       .sort((a, b) => b.min - a.min)[0];
-    // Parse each token: a fixed amount or a percentage of the gift
-    const resolved = new Set<number>();
+    // Parse each token: a fixed amount or a percentage of the gift.
+    // Fixed amounts pass through verbatim - original order, duplicates, and
+    // formatting (e.g. "5.00") are preserved for backwards compatibility.
+    // Only percentage-resolved amounts are deduped: against fixed amounts
+    // (compared numerically) and against each other.
+    const fixedValues = new Set<number>();
+    for (const token of options.amount.split(",")) {
+      if (token.includes("%")) continue;
+      const fixedValue = parseFloat(token);
+      if (!isNaN(fixedValue) && fixedValue > 0) {
+        fixedValues.add(fixedValue);
+      }
+    }
+    const resolvedPercentages = new Set<number>();
+    const resolved: string[] = [];
     for (const token of options.amount.split(",")) {
       let value = parseFloat(token);
       if (token.includes("%")) {
@@ -1363,14 +1392,22 @@ export class Regive {
           minAmount,
           maxAmount !== undefined ? Math.min(value, maxAmount) : value
         );
-      }
-      if (!isNaN(value) && value > 0) {
-        resolved.add(value);
+        if (fixedValues.has(value) || resolvedPercentages.has(value)) {
+          this.log(
+            `Skipping duplicate amount: ${token} resolves to ${value}, which is already in the list`,
+            "⚠️"
+          );
+          continue;
+        }
+        resolvedPercentages.add(value);
+        resolved.push(value.toString());
+      } else if (!isNaN(value) && value > 0) {
+        resolved.push(token.trim());
       } else {
         this.log(`Skipping invalid amount: ${token}`, "⚠️");
       }
     }
-    options.amount = [...resolved].sort((a, b) => a - b).join(",");
+    options.amount = resolved.join(",");
   }
 
   // Send an action to the parent window
