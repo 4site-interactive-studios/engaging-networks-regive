@@ -234,7 +234,7 @@ When test mode is enabled:
 You can also specify a payment method to test using the `test-method` attribute. This allows you to simulate how the Regive component behaves with different payment methods (e.g., card, Apple Pay, Google Pay) without needing to go through the actual payment process. Test must be enabled to use this feature. **NOTE:** Methods other than `card` are unable to simulate the test celebration process, they will submit to the form with an actual transaction.
 
 ```html
-<regive amount="5" test="true" test-method="stripedigitalwallets"></regive>
+<regive amount="5" test="true" test-method="stripedigitalwallet"></regive>
 ```
 
 Accepted values for `test-method` include:
@@ -242,7 +242,7 @@ Accepted values for `test-method` include:
 - `card`
 - `applepay`
 - `googlepay`
-- `stripedigitalwallets`
+- `stripedigitalwallet`
 - `paypaltouch`
 - `daf`
 

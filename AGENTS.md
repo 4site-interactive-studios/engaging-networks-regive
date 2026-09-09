@@ -141,7 +141,7 @@ Use the `log()` method inside the Regive class. Debug output is gated behind `?d
 ### Debugging
 
 - Append `?debug` to the script URL to enable verbose console logging.
-- Use `test="true"` on the `<regive>` tag to simulate donations without real submissions; add `test-method="card"` (or `applepay`, `googlepay`, `stripedigitalwallets`, `paypaltouch`, `daf`) to simulate a specific payment method.
+- Use `test="true"` on the `<regive>` tag to simulate donations without real submissions; add `test-method="card"` (or `applepay`, `googlepay`, `stripedigitalwallet`, `paypaltouch`, `daf`) to simulate a specific payment method.
 - `test-page-1.html` and `test-thank-you.html` in the repo root are local dev fixtures for manual testing.
 - Check browser console — log entries are emoji-coded for quick scanning.
 
