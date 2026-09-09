@@ -64,6 +64,7 @@ Built-in themes: `stacked`, `button-right`, `button-left`, `button-top`. Custom 
 - **Fixed amounts pass through verbatim:** original order, duplicates, and formatting (`5.00`) are preserved. Only percentage-resolved amounts are deduped — against fixed amounts (numeric comparison) and each other.
 - **Guardrails & rounding:** Percentages are clamped by `min-amount`/`max-amount` (which apply only to percentages) and rounded up per `rounding-tiers` (default `0:1,50:5`, tier chosen by gift amount). Values are rounded to cents before tier math so floating-point dust can't jump a step.
 - **Empty result:** If every token is skipped or invalid, `options.amount` is deleted so the consumer's `|| ["5"]` default kicks in — never leave an empty string behind (`"".split(",")` renders a broken button).
+- **Test-mode preview gift:** In test mode with no gift available and no `min-amount` set, a default preview gift (`defaultTestGiftAmount`, $50) drives percentages and theme rules so dynamic asks render realistically. Setting `min-amount` explicitly previews the fallback state instead.
 - Debug logs state where the gift amount came from (attribute vs. localStorage).
 
 ### Theme Rules

@@ -225,6 +225,24 @@ When test mode is enabled:
 - No actual donation will be processed
 - The submission will reset after 8 seconds
 
+### Previewing dynamic (percentage) asks
+
+In test mode, percentage amounts need a gift amount to calculate against. You can preview a specific donor gift with the `gift-amount` attribute — the full pipeline (guardrails, rounding tiers, dedupe, and theme rules) runs from that value:
+
+```html
+<!-- Previews a $500 donor without a real donation -->
+<regive amount="20%,50%" gift-amount="500" test="true"></regive>
+```
+
+If no gift amount is available (no `gift-amount` attribute and no stored donation), test mode uses a **default preview gift of $50** so dynamic asks render realistically. To preview the fallback state instead (percentages resolved against the minimum), set `min-amount` explicitly:
+
+```html
+<!-- Previews the fallback state: both buttons resolve to the $5 minimum -->
+<regive amount="20%,50%" min-amount="5" test="true"></regive>
+```
+
+Changing the `gift-amount` value updates both the amount buttons and the theme selected by `theme-rules`.
+
 **Test mode is useful for:**
 
 - Verifying your configuration

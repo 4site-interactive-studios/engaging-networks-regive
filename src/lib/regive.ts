@@ -7,6 +7,9 @@ const cardMethods = ["card", "cards", "VI", "MC", "DS", "AX"];
 // Sanity ceiling for the gift amount - guards against garbage input (e.g. an
 // encoded merge tag leaking through) resolving to an absurd ask
 const maxGiftAmount = 100000;
+// Default gift used in test mode to preview dynamic asks when no real gift is
+// available (and no min-amount is set to preview the fallback state)
+const defaultTestGiftAmount = 50;
 
 export class Regive {
   private readonly ENgrid = ENGrid;
@@ -1340,7 +1343,28 @@ export class Regive {
       );
       giftAmount = NaN;
     }
-    const giftUnavailable = isNaN(giftAmount) || giftAmount <= 0;
+    // Get the minimum and maximum guardrails early - in test mode, min-amount
+    // doubles as the opt-in switch for previewing the fallback state
+    const parsedMin = this.parseAmount(options.minAmount);
+    const hasMinAmount = !isNaN(parsedMin) && parsedMin > 0;
+    const minAmount = hasMinAmount ? parsedMin : 1;
+    let maxAmount: number | undefined = this.parseAmount(options.maxAmount);
+    if (isNaN(maxAmount)) maxAmount = undefined;
+    if (maxAmount !== undefined && minAmount > maxAmount) {
+      this.log(
+        `Minimum amount (${minAmount}) is greater than maximum amount (${maxAmount}). Only accepting minimum value`,
+        "⚠️"
+      );
+      maxAmount = undefined;
+    }
+    let giftUnavailable = isNaN(giftAmount) || giftAmount <= 0;
+    // In test mode with no gift available, preview dynamic asks with a default
+    // gift - unless min-amount is set, which previews the fallback state instead
+    if (giftUnavailable && options.test && !hasMinAmount) {
+      giftAmount = defaultTestGiftAmount;
+      giftSource = "the test-mode default preview gift";
+      giftUnavailable = false;
+    }
     if (!giftUnavailable) {
       this.log(
         `Gift amount resolved to ${giftAmount} from ${giftSource}`,
@@ -1356,19 +1380,6 @@ export class Regive {
       return;
     }
 
-    // Get the minimum and maximum guardrails, if applicable
-    const parsedMin = this.parseAmount(options.minAmount);
-    const hasMinAmount = !isNaN(parsedMin) && parsedMin > 0;
-    const minAmount = hasMinAmount ? parsedMin : 1;
-    let maxAmount: number | undefined = this.parseAmount(options.maxAmount);
-    if (isNaN(maxAmount)) maxAmount = undefined;
-    if (maxAmount !== undefined && minAmount > maxAmount) {
-      this.log(
-        `Minimum amount (${minAmount}) is greater than maximum amount (${maxAmount}). Only accepting minimum value`,
-        "⚠️"
-      );
-      maxAmount = undefined;
-    }
     if (giftUnavailable) {
       if (hasMinAmount) {
         this.log(
