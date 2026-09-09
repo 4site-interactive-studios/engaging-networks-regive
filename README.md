@@ -26,6 +26,12 @@ No third-party libraries are required, and the component is fully customizable t
     - [.showif-regive-enabled](#showif-regive-enabled)
     - [.showif-regive-success](#showif-regive-success)
   - [Regive Examples](#regive-examples)
+  - [Local Test Pages](#local-test-pages)
+    - [Running the pages](#running-the-pages)
+    - [The two paths through the component](#the-two-paths-through-the-component)
+    - [Panel controls](#panel-controls)
+    - [Testing theme rules](#testing-theme-rules)
+    - [What the pages fake](#what-the-pages-fake)
   - [Development](#development)
 
 ## Installation
@@ -442,6 +448,78 @@ Here's an example of a regive block with dynamic amounts:
 </regive>
 ```
 
+## Local Test Pages
+
+The repo ships a pair of static pages that stand in for an Engaging Networks donation form and its Thank You page, so you can run Regive end to end without an Engaging Networks account:
+
+- `test-page-1.html` is the mock donation form (page 1 of 2). It carries the Regive script, the VGS token fields, the mandatory supporter fields, and the custom theme `<template>` elements.
+- `test-thank-you.html` is the mock Thank You page (page 2 of 2). It carries the `<regive>` tag and a panel for editing every attribute without touching the file.
+
+Both pages mirror the field names, class names, and `pageJson` values the component queries, so Regive takes the same code paths it takes on a real page. They are local fixtures for development, not something to upload to Engaging Networks.
+
+### Running the pages
+
+1. Build the bundle the pages load:
+   ```bash
+   npm run build
+   ```
+2. Serve the repo root over HTTP:
+   ```bash
+   python3 -m http.server 8000
+   ```
+3. Open `http://localhost:8000/test-thank-you.html`
+
+`npm run dev` works as well; open the same filenames on the Vite port (`http://localhost:5173/test-thank-you.html`). Opening the files over `file://` does not work: Regive needs localStorage and a same-origin iframe, both of which browsers block there.
+
+### The two paths through the component
+
+Test mode is on by default in `test-thank-you.html`, so the banner renders on load, and clicking an amount simulates the donation, celebrates, and resets after 8 seconds. Nothing is submitted and no card is needed. This is the fast path for checking layout, themes, amounts, and copy.
+
+For the real submission path, turn test mode off and start on page 1. Write the card tokens, submit, and land on the Thank You page. Clicking an amount there submits the chained form, the iframe navigates to the Thank You page the way Engaging Networks would, and Regive matches its stored `regive-submitted` flag before reporting success to the parent.
+
+### Panel controls
+
+The panel on the Thank You page edits every `<regive>` attribute, rewrites the URL, and shows the tag it produced, ready to paste into an Engaging Networks code block. It also logs the `postMessage` traffic coming out of the embed, lists the `regive-*` localStorage keys, and names the theme Regive settled on.
+
+Harness settings are separate from the tag's attributes. They live in URL parameters and persist in localStorage under `regive-test-harness`, so the chained iframe inherits them:
+
+| Parameter  | Default          | What it does                                                                                |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------- |
+| `debug`    | `1`              | Appends `?debug` to the script source in both frames                                        |
+| `script`   | `dist/regive.js` | Which bundle to load, so you can point at `dist/regive.min.js` to test the production file   |
+| `currency` | `USD`            | Selects `transaction.paycurrency`, which sets the currency symbol on the buttons             |
+| `captcha`  | `0`              | Renders a mock reCAPTCHA, with a button that fires the callback Regive wraps                 |
+| `wallets`  | `0`              | Renders a mock `#en__digitalWallet` block and a Stripe `paymentRequest` stub                  |
+| `prefill`  | `1`              | Fills the mandatory supporter fields in the chained iframe, standing in for session prefill   |
+| `fail`     | `0`              | Fakes a failed Engaging Networks submission, so you can watch Regive exit                    |
+
+### Testing theme rules
+
+`test-page-1.html` carries a ladder of four custom themes built for exercising `theme-rules`:
+
+| Template id      | Tier                            |
+| ---------------- | ------------------------------- |
+| `tier-supporter` | Base tier, below every threshold |
+| `tier-sustainer` | $100+                           |
+| `tier-leader`    | $500+                           |
+| `tier-champion`  | $1,000+                         |
+
+The "tier ladder" preset in the panel wires them up as `theme="tier-supporter"` with `theme-rules="100:tier-sustainer,500:tier-leader,1000:tier-champion"`. The row of gift amounts next to it steps a donor gift across the thresholds, and the readout names the template that rendered, so you can confirm the rule that won rather than inferring it from the layout. Two presets cover the awkward cases: "broken rule" points a rule at a theme that does not exist so you can watch the fallback chain, and "no rules" clears them.
+
+Remember that test mode substitutes its $50 preview gift when no gift amount is available, so rules still evaluate against $50. Setting `min-amount` previews the fallback state instead, and rules are ignored there.
+
+All five templates on page 1, the four tiers plus a minimal `test-theme`, print `{{ask-amount}}` twice: once in their copy, once from a CSS pseudo-element. The panel reads both values back, which covers the substitution surviving inside a `<style>` block. Built-in themes get no `{{ask-amount}}` substitution, and the readout says so when one is active.
+
+### What the pages fake
+
+Three behaviors have no static equivalent, so the pages simulate them. Each one is commented where it happens:
+
+- **Session prefill.** Engaging Networks repopulates the supporter fields on the chained page from the donor's session. The pages replay whatever page 1 submitted. Set `prefill=0` with test mode off to watch Regive refuse to render on empty required fields.
+- **DOM mutations.** Regive re-reads the form whenever the DOM changes, and real Engaging Networks pages change it constantly. The pages stamp a data attribute on the form after any scripted value change, because setting an input's `value` property produces no mutation record on its own.
+- **The iframe URL.** Regive normally rewrites the `/page/<id>/donate/<n>` path back to `/1` to find page 1. These files have no such path, so the panel sets `base-page` to page 1's absolute URL.
+
+The mock wallet block is thinner than the rest. Moving the wallet UI into the banner and attaching the Stripe submit listener both run, but no gateway is involved: a placeholder iframe satisfies the "wallet UI is ready" check, and since the component hides iframes in the embedded frame, only the mock button stays visible.
+
 ## Development
 
 1. Clone the repository
@@ -453,7 +531,7 @@ Here's an example of a regive block with dynamic amounts:
    ```bash
    npm run dev
    ```
-4. Open your browser and navigate to `http://localhost:3000`
+4. Open a test page on the Vite port, for example `http://localhost:5173/test-thank-you.html` (see [Local Test Pages](#local-test-pages)). There is no index page at the root
 5. Open the console to see debug messages
 6. Build for production
    ```bash

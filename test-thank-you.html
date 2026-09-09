@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Regive test — EN mock thank-you page (2 of 2)</title>
+
+    <!--
+      ==========================================================================
+      REGIVE TEST HARNESS — THANK-YOU PAGE (hosts the <regive> embed)
+      ==========================================================================
+
+      Companion to test-page-1.html. This is the page that carries the <regive>
+      tag: Regive replaces the tag with an iframe pointing back at page 1 with a
+      ?chain parameter, then talks to that iframe over postMessage.
+
+      HOW TO RUN
+        1. npm run build                     (creates dist/regive.js)
+        2. python3 -m http.server 8000       (from the repo root)
+        3. open http://localhost:8000/test-thank-you.html
+           file:// will not work — Regive needs localStorage and a same-origin
+           iframe.
+
+      TWO PATHS THROUGH THE COMPONENT
+        * test="true" (the default here): clicking an amount fakes the donation,
+          celebrates, then resets after 8s. Nothing is submitted, so no card is
+          needed. Best for checking layout, themes, amounts and copy.
+        * test off: the real path. Start on test-page-1.html, write the card
+          tokens, submit, and land here. Clicking an amount then submits the
+          chained form, which navigates the iframe to this page again (as EN
+          would), where Regive matches its "regive-submitted" flag and reports
+          success to the parent.
+
+      CONFIGURING THE EMBED
+        Every <regive> attribute can be set from the URL, e.g.
+          ?amount=25%25,50&gift-amount=$100.00&theme=test-theme&test=0
+        The panel below writes those params for you and shows the resulting tag.
+        Attribute values are applied to the literal <regive> tag further down,
+        which is also the place to change the defaults permanently.
+
+      TESTING THEME RULES
+        theme-rules pairs a gift threshold with a theme name
+        ("500:tier-leader"), and the highest threshold the gift clears wins.
+        The theme attribute covers everything below the lowest threshold.
+        With no gift amount at all, test mode substitutes its $50 preview gift
+        and the rules still run against that; outside test mode, or with
+        min-amount set (which previews the fallback state), Regive ignores the
+        rules entirely.
+        test-page-1.html carries a ladder of four templates for this —
+        tier-supporter (base), tier-sustainer ($100+), tier-leader ($500+),
+        tier-champion ($1,000+). Hit "tier ladder" in the panel to wire them up,
+        then step the gift amount through the tiers and watch which template
+        renders; the panel names the theme Regive actually chose.
+        A rule naming a theme that does not exist falls back to the theme
+        attribute, then to stacked — "broken rule" sets that up.
+
+      {{ask-amount}}
+        The ladder templates print it in their copy and again from a CSS
+        pseudo-element; the panel reads back both. It resolves to the first
+        amount button after percentages are worked out, formatted as USD, and
+        it only applies to custom templates — never the built-in themes.
+
+      base-page: set at runtime by the harness.
+        Regive normally derives the iframe URL by rewriting EN's
+        /page/<id>/donate/<n> path back to /1. These test files have no such
+        path, so without an absolute base-page the iframe would load this
+        thank-you page instead of page 1.
+    -->
+
+    <script>
+      // ---- harness config (shared verbatim with test-page-1.html) ----------
+      const HARNESS_KEY = "regive-test-harness";
+      const HARNESS_DEFAULTS = {
+        debug: "1",
+        script: "dist/regive.js",
+        currency: "USD",
+        captcha: "0",
+        wallets: "0",
+        prefill: "1",
+        fail: "0",
+      };
+      const harnessOn = (value) =>
+        ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+
+      const harness = (() => {
+        let stored = {};
+        try {
+          stored = JSON.parse(localStorage.getItem(HARNESS_KEY) || "{}");
+        } catch (e) {
+          stored = {};
+        }
+        const config = Object.assign({}, HARNESS_DEFAULTS, stored);
+        const params = new URLSearchParams(location.search);
+        Object.keys(HARNESS_DEFAULTS).forEach((key) => {
+          if (params.has(key)) config[key] = params.get(key) || "1";
+        });
+        try {
+          localStorage.setItem(HARNESS_KEY, JSON.stringify(config));
+        } catch (e) {
+          /* private mode — carry on with in-memory config */
+        }
+        return config;
+      })();
+
+      // Thank-you page = last page of the campaign: ENGrid.isThankYouPage() is
+      // simply pageNumber === pageCount. campaignPageId must match page 1.
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 2,
+        pageCount: 2,
+        campaignPageId: 999999,
+        clientId: 12345,
+        giftProcess: true,
+      };
+    </script>
+
+    <style>
+      /* ---- harness chrome (none of this is part of Regive) ---------------- */
+      body {
+        margin: 0;
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #16202c;
+        background: #eef1f5;
+      }
+      .harness {
+        box-sizing: border-box;
+        background: #10151c;
+        color: #e7ecf3;
+        padding: 12px 16px 16px;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .harness h1 {
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin: 0 0 4px;
+        color: #ffd479;
+      }
+      .harness a {
+        color: #7cc4ff;
+      }
+      .harness fieldset {
+        border: 1px solid #2c3846;
+        border-radius: 6px;
+        margin: 10px 0 0;
+        padding: 8px 10px 10px;
+      }
+      .harness legend {
+        color: #9fb3c8;
+        padding: 0 4px;
+      }
+      .harness label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin: 2px 10px 2px 0;
+      }
+      .harness input[type="text"],
+      .harness select {
+        font: inherit;
+        padding: 2px 4px;
+        border: 1px solid #3a4757;
+        border-radius: 4px;
+        background: #1b2330;
+        color: #e7ecf3;
+      }
+      .harness button {
+        font: inherit;
+        cursor: pointer;
+        padding: 4px 10px;
+        margin: 4px 6px 0 0;
+        border: 1px solid #3a4757;
+        border-radius: 4px;
+        background: #26303d;
+        color: #e7ecf3;
+      }
+      .harness button:hover {
+        background: #33404f;
+      }
+      .harness button.harness-primary {
+        background: #1d6f42;
+        border-color: #298d56;
+      }
+      .harness-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 2px 16px;
+      }
+      .harness-grid label {
+        display: grid;
+        grid-template-columns: 190px 1fr;
+        align-items: center;
+        margin: 0;
+      }
+      .harness-grid input[type="text"] {
+        width: 100%;
+      }
+      .harness-cols {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 10px;
+      }
+      .harness pre {
+        margin: 0;
+        padding: 8px;
+        background: #1b2330;
+        border: 1px solid #2c3846;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: #b6f2c8;
+        max-height: 150px;
+        overflow: auto;
+      }
+      .harness ol {
+        margin: 0;
+        padding: 0 0 0 4px;
+        list-style: none;
+        max-height: 190px;
+        overflow: auto;
+      }
+      .harness ol li {
+        border-bottom: 1px solid #232d3a;
+        padding: 1px 0;
+      }
+      .harness-time {
+        color: #5b6979;
+      }
+      .harness-action {
+        color: #ffd479;
+      }
+      .harness table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      .harness th,
+      .harness td {
+        text-align: left;
+        padding: 2px 8px 2px 0;
+        border-bottom: 1px solid #232d3a;
+        vertical-align: top;
+      }
+      .harness th {
+        color: #9fb3c8;
+        font-weight: normal;
+        white-space: nowrap;
+      }
+      .harness td {
+        color: #b6f2c8;
+        word-break: break-all;
+      }
+      .harness td.harness-empty {
+        color: #5b6979;
+      }
+      .harness-role {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: #33404f;
+        color: #ffd479;
+      }
+      .harness-note {
+        color: #9fb3c8;
+        margin: 6px 0 0;
+        max-width: 90ch;
+      }
+
+      /* ---- mock EN thank-you page ------------------------------------------ */
+      .en__component--page {
+        max-width: 720px;
+        margin: 24px auto;
+        padding: 24px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      }
+      .en__component--page h2 {
+        margin-top: 0;
+      }
+      .harness-receipt {
+        margin: 0 0 20px;
+        padding: 12px 16px;
+        background: #f4f6f9;
+        border-left: 4px solid #007bff;
+        border-radius: 4px;
+      }
+      .harness-receipt dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 2px 12px;
+        margin: 0;
+        font-size: 14px;
+      }
+      .harness-receipt dt {
+        color: #6a7887;
+      }
+      .harness-receipt dd {
+        margin: 0;
+        font-weight: 600;
+      }
+      /* Styling for Regive's own utility classes, so it is obvious when they
+         switch on. The show/hide behaviour itself comes from the component. */
+      .showif-regive-enabled,
+      .showif-regive-success {
+        margin: 16px 0;
+        padding: 12px 16px;
+        border-radius: 4px;
+      }
+      .showif-regive-enabled {
+        background: #eaf4ff;
+        border: 1px solid #b8daff;
+      }
+      .showif-regive-success {
+        background: #e7f7ec;
+        border: 1px solid #b7e3c4;
+      }
+    </style>
+  </head>
+
+  <body class="en__donationPage">
+    <!-- =====================================================================
+         HARNESS PANEL — scaffolding only.
+         ================================================================== -->
+    <div class="harness" id="harness">
+      <h1>Regive harness — thank-you page (the &lt;regive&gt; embed)</h1>
+      <div>
+        role: <span class="harness-role" id="harness-frame-role">standalone</span>
+        &nbsp;|&nbsp; script: <span id="harness-script-src"></span>
+        &nbsp;|&nbsp; body: <span id="harness-body-data">—</span>
+        &nbsp;|&nbsp; <a href="test-page-1.html">← page 1 (donation form)</a>
+      </div>
+
+      <fieldset>
+        <legend>harness config — applies to this page and the chained iframe</legend>
+        <label><input type="checkbox" id="cfg-debug" /> debug</label>
+        <label><input type="checkbox" id="cfg-captcha" /> captcha</label>
+        <label><input type="checkbox" id="cfg-wallets" /> digital wallets</label>
+        <label><input type="checkbox" id="cfg-prefill" /> prefill in iframe</label>
+        <label><input type="checkbox" id="cfg-fail" /> failed submission</label>
+        <label>
+          currency
+          <select id="cfg-currency">
+            <option>USD</option>
+            <option>EUR</option>
+            <option>GBP</option>
+            <option>CAD</option>
+          </select>
+        </label>
+        <label>script <input type="text" id="cfg-script" size="26" /></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>&lt;regive&gt; attributes — blank means "leave the attribute off"</legend>
+        <div class="harness-grid" id="harness-attrs"></div>
+        <datalist id="harness-theme-list"></datalist>
+        <button type="button" id="cfg-apply" class="harness-primary">Apply &amp; reload</button>
+        <button type="button" id="cfg-reset">Reset to file defaults</button>
+        <button type="button" id="cfg-use-receipt">gift-amount = receipt amount</button>
+        <button type="button" id="cfg-clear-storage">Clear regive-* storage</button>
+        <p class="harness-note">
+          Percent signs need encoding when typed straight into the address bar
+          (<code>amount=25%25,50</code>), but the fields above handle that.
+        </p>
+      </fieldset>
+
+      <fieldset>
+        <legend>theme rules — presets, then step the gift through the tiers</legend>
+        <div>
+          rules:
+          <button type="button" data-rules-preset="ladder">tier ladder</button>
+          <button type="button" data-rules-preset="two">two tiers</button>
+          <button type="button" data-rules-preset="broken">broken rule</button>
+          <button type="button" data-rules-preset="none">no rules</button>
+        </div>
+        <div>
+          gift-amount:
+          <button type="button" data-gift="$25.00">$25</button>
+          <button type="button" data-gift="$99.00">$99</button>
+          <button type="button" data-gift="$100.00">$100</button>
+          <button type="button" data-gift="$499.00">$499</button>
+          <button type="button" data-gift="$500.00">$500</button>
+          <button type="button" data-gift="$1,250.00">$1,250</button>
+          <button type="button" data-gift="{receipt_data~amount~[en1]}">unresolved tag</button>
+          <button type="button" data-gift="">clear</button>
+        </div>
+        <table>
+          <tr>
+            <th>theme rendered</th>
+            <td id="harness-theme-used">—</td>
+          </tr>
+          <tr>
+            <th>{{ask-amount}} in copy</th>
+            <td id="harness-ask-copy">—</td>
+          </tr>
+          <tr>
+            <th>{{ask-amount}} from CSS</th>
+            <td id="harness-ask-css">—</td>
+          </tr>
+        </table>
+        <p class="harness-note">
+          Each button applies its value and reloads. Presets keep whatever
+          gift-amount is set, and the gift buttons keep the current rules, so
+          the two rows can be combined in either order.
+        </p>
+      </fieldset>
+
+      <div class="harness-cols">
+        <fieldset>
+          <legend>rendered tag + iframe</legend>
+          <pre id="harness-tag">—</pre>
+          <p class="harness-note">iframe src: <span id="harness-iframe-src">—</span></p>
+        </fieldset>
+
+        <fieldset>
+          <legend>postMessage from the embed (sender: "regive")</legend>
+          <ol id="harness-log"></ol>
+        </fieldset>
+
+        <fieldset>
+          <legend>localStorage</legend>
+          <table id="harness-storage"></table>
+        </fieldset>
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         MOCK EN THANK-YOU PAGE
+         ================================================================== -->
+    <form class="en__component en__component--page">
+      <h2>Thank you for your gift!</h2>
+
+      <div class="harness-receipt">
+        <dl>
+          <dt>Amount</dt>
+          <dd id="harness-receipt-amount">—</dd>
+          <dt>Merge tag</dt>
+          <dd><code>{receipt_data~amount~[en1]}</code></dd>
+        </dl>
+        <p class="harness-note" style="color: #6a7887; margin: 8px 0 0">
+          Stands in for EN's receipt block. The amount is whatever page 1 stored
+          in <code>regive-donation-amt</code>; pass it to the embed with
+          <code>gift-amount</code> to drive percentage amounts and theme rules.
+          Leave <code>gift-amount</code> empty to test the storage fallback, or
+          set it to the literal merge tag to test the unresolved-tag path.
+        </p>
+      </div>
+
+      <!-- Regive's utility classes: shown only while the embed is enabled /
+           after a successful additional gift. -->
+      <div class="showif-regive-enabled">
+        <strong>.showif-regive-enabled</strong> — visible because Regive set
+        <code>data-regive-enabled="true"</code> on the body.
+      </div>
+
+      <div class="showif-regive-success">
+        <strong>.showif-regive-success</strong> — visible because an additional
+        gift succeeded.
+      </div>
+
+      <!-- ===================================================================
+           THE EMBED. Attributes here are the file defaults; the harness panel
+           overrides them from URL params, and adds base-page at runtime.
+           Copy this tag (see "rendered tag" in the panel) into an EN code block
+           on a real thank-you page.
+           ================================================================ -->
+      <div class="en__component en__component--codeblock">
+        <regive
+          amount="5,10,25"
+          heading="Make another impact today!"
+          thank-you-message="Thank you for your additional gift!"
+          button-label="Add {{amount}}"
+          source="REGIVE-TEST"
+          test="true"
+        ></regive>
+      </div>
+    </form>
+
+    <script>
+      // =======================================================================
+      // HARNESS BEHAVIOUR
+      // Runs while the document is still parsing, i.e. before the Regive module
+      // script at the bottom — the <regive> tag must be final before Regive
+      // reads it.
+      // =======================================================================
+      const regiveTag = document.querySelector("regive");
+      const isEmbedded = window !== window.parent;
+      const params = new URLSearchParams(location.search);
+
+      // Every attribute the component understands, in README order.
+      const REGIVE_ATTRS = [
+        "amount",
+        "button-label",
+        "heading",
+        "thank-you-message",
+        "source",
+        "bg-color",
+        "txt-color",
+        "button-bg-color",
+        "button-txt-color",
+        "theme",
+        "theme-rules",
+        "confetti",
+        "gift-amount",
+        "min-amount",
+        "max-amount",
+        "rounding-tiers",
+        "base-page",
+        "params",
+        "ignore-required-fields",
+        "test-method",
+        "height",
+      ];
+      const REGIVE_FLAGS = ["test", "digital-wallets"];
+
+      // Built-in themes, then the <template> themes carried by test-page-1.html.
+      const BUILT_IN_THEMES = ["stacked", "button-right", "button-left", "button-top"];
+      const TEMPLATE_THEMES = [
+        "test-theme",
+        "tier-supporter",
+        "tier-sustainer",
+        "tier-leader",
+        "tier-champion",
+      ];
+      // Presets for the theme-rules row. The ladder matches the thresholds
+      // documented in test-page-1.html.
+      const RULE_PRESETS = {
+        ladder: {
+          theme: "tier-supporter",
+          "theme-rules": "100:tier-sustainer,500:tier-leader,1000:tier-champion",
+        },
+        two: { theme: "tier-supporter", "theme-rules": "500:tier-champion" },
+        // Names a theme that exists on neither list, to exercise the fallback
+        // chain (rule -> theme attribute -> stacked) and its warning.
+        broken: { theme: "tier-sustainer", "theme-rules": "100:no-such-theme" },
+        none: { theme: "", "theme-rules": "" },
+      };
+
+      // ---- URL params override the attributes on the tag -------------------
+      REGIVE_ATTRS.concat(REGIVE_FLAGS).forEach((attribute) => {
+        if (!params.has(attribute)) return;
+        const value = params.get(attribute);
+        // An empty param removes the attribute, which is not the same as an
+        // empty attribute value.
+        if (value === "") regiveTag.removeAttribute(attribute);
+        else regiveTag.setAttribute(attribute, value);
+      });
+
+      // ---- base-page (see the note in the file header) ----------------------
+      if (!regiveTag.hasAttribute("base-page")) {
+        regiveTag.setAttribute(
+          "base-page",
+          new URL("test-page-1.html", location.href).href
+        );
+      }
+
+      // Snapshot the tag before Regive replaces it with the iframe.
+      document.getElementById("harness-tag").textContent = regiveTag.outerHTML
+        .replace(/\s+([a-z-]+=")/g, "\n  $1")
+        .replace(/"><\/regive>/, '"\n></regive>');
+
+      // ---- attribute editor -------------------------------------------------
+      const attributeGrid = document.getElementById("harness-attrs");
+      REGIVE_FLAGS.forEach((flag) => {
+        const label = document.createElement("label");
+        label.innerHTML = `<span>${flag}</span><span><input type="checkbox" data-attr="${flag}" /></span>`;
+        label.querySelector("input").checked = ["true", "1", "yes", "on"].includes(
+          (regiveTag.getAttribute(flag) || "").toLowerCase()
+        );
+        attributeGrid.appendChild(label);
+      });
+      REGIVE_ATTRS.forEach((attribute) => {
+        const label = document.createElement("label");
+        label.innerHTML = `<span>${attribute}</span><input type="text" data-attr="${attribute}" />`;
+        // base-page is filled in by the harness; show it, but as a blank field
+        // it stays automatic.
+        // Make the theme names discoverable without opening page 1.
+        if (attribute === "theme") {
+          label.querySelector("input").setAttribute("list", "harness-theme-list");
+        }
+        label.querySelector("input").value =
+          attribute === "base-page" ? "" : regiveTag.getAttribute(attribute) || "";
+        label
+          .querySelector("input")
+          .setAttribute(
+            "placeholder",
+            attribute === "base-page" ? regiveTag.getAttribute("base-page") : ""
+          );
+        attributeGrid.appendChild(label);
+      });
+
+      BUILT_IN_THEMES.concat(TEMPLATE_THEMES).forEach((name) => {
+        document
+          .getElementById("harness-theme-list")
+          .appendChild(new Option(name, name));
+      });
+
+      // ---- theme-rules presets and gift-amount steps -----------------------
+      // Each button writes into the attribute grid, then reuses "Apply & reload"
+      // so there is only one code path for building the URL.
+      const applyWith = (changes) => {
+        Object.entries(changes).forEach(([attribute, value]) => {
+          const field = attributeGrid.querySelector(`[data-attr="${attribute}"]`);
+          if (field) field.value = value;
+        });
+        document.getElementById("cfg-apply").click();
+      };
+      document.querySelectorAll("[data-rules-preset]").forEach((button) => {
+        button.addEventListener("click", () =>
+          applyWith(RULE_PRESETS[button.dataset.rulesPreset])
+        );
+      });
+      document.querySelectorAll("[data-gift]").forEach((button) => {
+        button.addEventListener("click", () =>
+          applyWith({ "gift-amount": button.dataset.gift })
+        );
+      });
+
+      const configInputs = {
+        debug: document.getElementById("cfg-debug"),
+        captcha: document.getElementById("cfg-captcha"),
+        wallets: document.getElementById("cfg-wallets"),
+        prefill: document.getElementById("cfg-prefill"),
+        fail: document.getElementById("cfg-fail"),
+        currency: document.getElementById("cfg-currency"),
+        script: document.getElementById("cfg-script"),
+      };
+      Object.entries(configInputs).forEach(([key, input]) => {
+        if (input.type === "checkbox") input.checked = harnessOn(harness[key]);
+        else input.value = harness[key];
+      });
+
+      document.getElementById("cfg-apply").addEventListener("click", () => {
+        const url = new URL(location.pathname, location.href);
+        Object.entries(configInputs).forEach(([key, input]) => {
+          url.searchParams.set(
+            key,
+            input.type === "checkbox" ? (input.checked ? "1" : "0") : input.value
+          );
+        });
+        attributeGrid.querySelectorAll("[data-attr]").forEach((input) => {
+          const attribute = input.dataset.attr;
+          if (input.type === "checkbox") {
+            // Only send the flag when it is on: "test=" means "no attribute".
+            url.searchParams.set(attribute, input.checked ? "true" : "");
+          } else if (input.value !== "") {
+            url.searchParams.set(attribute, input.value);
+          } else if (regiveTag.hasAttribute(attribute) && attribute !== "base-page") {
+            // Cleared a field that the file sets by default — keep it off.
+            url.searchParams.set(attribute, "");
+          }
+        });
+        location.href = url.toString();
+      });
+
+      document.getElementById("cfg-reset").addEventListener("click", () => {
+        localStorage.removeItem(HARNESS_KEY);
+        location.href = location.pathname;
+      });
+
+      // ---- receipt ----------------------------------------------------------
+      const receiptAmount = localStorage.getItem("regive-donation-amt");
+      document.getElementById("harness-receipt-amount").textContent = receiptAmount
+        ? "$" + receiptAmount
+        : "— (nothing stored: submit a gift on page 1 first)";
+      document.getElementById("cfg-use-receipt").addEventListener("click", () => {
+        const field = attributeGrid.querySelector('[data-attr="gift-amount"]');
+        field.value = receiptAmount ? "$" + receiptAmount : "";
+        field.focus();
+      });
+
+      // ---- postMessage log --------------------------------------------------
+      const logList = document.getElementById("harness-log");
+      const iframeSrcOut = document.getElementById("harness-iframe-src");
+      const bodyDataOut = document.getElementById("harness-body-data");
+      const themeUsedOut = document.getElementById("harness-theme-used");
+      const askCopyOut = document.getElementById("harness-ask-copy");
+      const askCssOut = document.getElementById("harness-ask-css");
+
+      // Which theme did Regive actually settle on, and what did {{ask-amount}}
+      // resolve to? Read it out of the embed rather than guessing from the URL,
+      // since the answer depends on the gift amount and the fallback chain.
+      const readThemeState = () => {
+        const iframe = document.querySelector("iframe.regive-iframe");
+        let doc = null;
+        try {
+          doc = iframe && iframe.contentDocument;
+        } catch (e) {
+          doc = null; // cross-origin base-page: nothing to read
+        }
+        if (!doc || !doc.querySelector(".regive-embed")) {
+          themeUsedOut.textContent = "— (no banner rendered)";
+          askCopyOut.textContent = "—";
+          askCssOut.textContent = "—";
+          return;
+        }
+        const builtIn = doc.querySelector(".regive-banner[data-theme]");
+        if (builtIn) {
+          themeUsedOut.textContent =
+            builtIn.dataset.theme + " — built-in theme, no {{ask-amount}} support";
+        } else {
+          // Regive removes the <template> it renders, so the one now missing
+          // from page 1's DOM is the one it used.
+          const consumed = TEMPLATE_THEMES.filter((id) => !doc.getElementById(id));
+          themeUsedOut.textContent = consumed.length
+            ? consumed.join(", ") + " — custom template"
+            : "custom template (id not in the harness list)";
+        }
+        const ask = doc.querySelector("[data-harness-ask]");
+        askCopyOut.textContent = ask
+          ? ask.textContent.trim()
+          : "— (this theme prints no ask amount)";
+        const stamp = doc.querySelector("[data-harness-stamp]");
+        askCssOut.textContent = stamp
+          ? doc.defaultView.getComputedStyle(stamp, "::after").content
+          : "— (this theme has no pseudo-element ask amount)";
+      };
+
+      const refreshStatus = () => {
+        const iframe = document.querySelector("iframe.regive-iframe");
+        iframeSrcOut.textContent = iframe ? iframe.src : "— (no iframe yet)";
+        readThemeState();
+        const attributes = Array.from(document.body.attributes)
+          .filter((attribute) => attribute.name.startsWith("data-regive-"))
+          .map((attribute) => attribute.name + "=" + attribute.value);
+        bodyDataOut.textContent = attributes.length ? attributes.join(" ") : "—";
+      };
+      window.addEventListener("message", (event) => {
+        if (!event.data || event.data.sender !== "regive") return;
+        const item = document.createElement("li");
+        const time = new Date().toLocaleTimeString("en-US", { hour12: false });
+        item.innerHTML =
+          `<span class="harness-time">${time}</span> ` +
+          `<span class="harness-action">${event.data.action}</span>` +
+          (event.data.value === null || event.data.value === undefined
+            ? ""
+            : " " + String(event.data.value));
+        logList.insertBefore(item, logList.firstChild);
+        while (logList.children.length > 100) logList.lastChild.remove();
+        refreshStatus();
+      });
+      setTimeout(refreshStatus, 300);
+      setInterval(refreshStatus, 1500);
+
+      // ---- storage readout --------------------------------------------------
+      const REGIVE_KEYS = [
+        "regive-num",
+        "regive-ver",
+        "regive-exp",
+        "regive-card",
+        "regive-paymenttype",
+        "regive-dw-paymenttype",
+        "regive-donation-amt",
+        "regive-submitted",
+        "regive-height",
+      ];
+      const storageTable = document.getElementById("harness-storage");
+      function renderStorage() {
+        storageTable.innerHTML = REGIVE_KEYS.map((key) => {
+          const value = localStorage.getItem(key);
+          return `<tr><th>${key}</th><td class="${value ? "" : "harness-empty"}">${
+            value === null
+              ? "—"
+              : String(value).replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;"))
+          }</td></tr>`;
+        }).join("");
+      }
+      renderStorage();
+      setInterval(renderStorage, 750);
+      document.getElementById("cfg-clear-storage").addEventListener("click", () => {
+        REGIVE_KEYS.forEach((key) => localStorage.removeItem(key));
+        localStorage.removeItem("regive-test-donor");
+        renderStorage();
+      });
+
+      document.getElementById("harness-frame-role").textContent = isEmbedded
+        ? "embedded (post-submit thank-you inside the iframe)"
+        : "standalone (hosts the embed)";
+
+      // ---- load Regive ------------------------------------------------------
+      const scriptSrc = harness.script + (harnessOn(harness.debug) ? "?debug" : "");
+      document.getElementById("harness-script-src").textContent = scriptSrc;
+      const regiveScript = document.createElement("script");
+      regiveScript.type = "module";
+      regiveScript.src = scriptSrc;
+      regiveScript.addEventListener("error", () => {
+        document.getElementById("harness-script-src").textContent =
+          scriptSrc + " — FAILED TO LOAD (run `npm run build`)";
+      });
+      document.body.appendChild(regiveScript);
+    </script>
+  </body>
+</html>
