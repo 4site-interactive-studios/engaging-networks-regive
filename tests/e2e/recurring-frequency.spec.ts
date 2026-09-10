@@ -62,6 +62,32 @@ test("exits instead of submitting a monthly donation on a one-time-only page", a
   await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
 });
 
+test("exits when the page has no recurrpay field at all", async ({ page }) => {
+  await page.goto("/page/12345/nofields/2");
+
+  // The embedded page has no recurring fields whatsoever, so the child exits
+  // instead of creating a hidden recurrpay field and submitting anyway
+  await expect(page.locator(".regive-container")).toHaveCount(0);
+  await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
+});
+
+test("creates a hidden recurrfreq field when the page has none", async ({
+  page,
+}) => {
+  await page.goto("/page/12345/nofreq/2");
+
+  const frame = page.frameLocator("iframe.regive-iframe");
+  await expect(frame.locator(".regive-amount-btn")).toHaveCount(2);
+  await frame.locator('.regive-amount-btn[data-amount="5"]').click();
+
+  // The embedded form posts to /echo: recurrpay=Y is checked and the missing
+  // recurrfreq field is created with the configured frequency
+  const echo = frame.locator("#echo");
+  await expect(echo).toBeAttached();
+  await expect(echo).toContainText("transaction.recurrpay=Y");
+  await expect(echo).toContainText("transaction.recurrfreq=MONTHLY");
+});
+
 test("exits on an unknown configured frequency instead of falling back to one-time", async ({
   page,
 }) => {

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture — Donation Page 1 (no recurring fields)</title>
+    <script>
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 1,
+        pageCount: 2,
+        campaignPageId: 12345,
+        clientId: 678,
+      };
+    </script>
+  </head>
+  <body>
+    <form class="en__component" action="/echo" method="post">
+      <div class="en__component en__component--formblock">
+        <div class="en__field en__mandatory">
+          <input
+            class="en__field__input"
+            type="text"
+            name="supporter.firstName"
+            value="Ada"
+          />
+        </div>
+        <div class="en__field en__mandatory">
+          <input
+            class="en__field__input"
+            type="email"
+            name="supporter.emailAddress"
+            value="ada@example.org"
+          />
+        </div>
+        <input type="hidden" name="transaction.paymenttype" value="" />
+        <input type="hidden" name="supporter.appealCode" value="" />
+        <input type="hidden" name="transaction.ccnumber" value="" />
+        <input type="hidden" name="transaction.ccvv" value="" />
+        <input type="hidden" name="transaction.ccexpire" value="" />
+        <input type="hidden" name="transaction.vgs.cardType" value="" />
+        <input type="radio" name="transaction.donationAmt" value="5" />
+        <input type="radio" name="transaction.donationAmt" value="10" />
+        <input type="text" name="transaction.donationAmt.other" value="" />
+        <!-- One-time only page: no recurrpay or recurrfreq fields at all -->
+      </div>
+      <div class="en__component en__submit">
+        <button type="submit">Donate</button>
+      </div>
+    </form>
+    <script src="/regive.js"></script>
+  </body>
+</html>

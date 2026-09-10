@@ -1786,15 +1786,21 @@ export class Regive {
         );
     }
   }
-  // Write a field value, creating the field as a hidden input if it does not
-  // exist, and verify the write by re-reading the field. Returns false when
-  // the value did not stick (e.g. a select or radio group with no matching
-  // option).
-  private applyFieldValue(name: string, value: string): boolean {
+  // Write a field value and verify the write by re-reading the field.
+  // Returns false when the value did not stick (e.g. a select or radio group
+  // with no matching option) or, unless createIfMissing is true, when the
+  // field does not exist on the page at all.
+  private applyFieldValue(
+    name: string,
+    value: string,
+    createIfMissing: boolean = false
+  ): boolean {
     if (this.ENgrid.getField(name)) {
       this.ENgrid.setFieldValue(name, value);
-    } else {
+    } else if (createIfMissing) {
       this.ENgrid.createHiddenInput(name, value);
+    } else {
+      return false;
     }
     return this.ENgrid.getFieldValue(name) === value;
   }
@@ -1849,6 +1855,13 @@ export class Regive {
     }
     // Recurring donation: set recurrpay=Y and recurrfreq to the chosen frequency.
     // transaction.recurrday is left untouched - EN defaults it to the current day.
+    if (!recurrpayField) {
+      this.log(
+        "No recurrpay field found - cannot make a recurring donation on this page",
+        "🔴"
+      );
+      return false;
+    }
     if (!this.applyFieldValue("transaction.recurrpay", "Y")) {
       this.log(
         'Could not set recurrpay to "Y" - cannot make a recurring donation on this page',
@@ -1856,7 +1869,11 @@ export class Regive {
       );
       return false;
     }
-    if (!this.applyFieldValue("transaction.recurrfreq", frequency)) {
+    // A missing recurrfreq field is created as a hidden input: the page
+    // accepting recurrpay=Y confirms it supports recurring gifts, so the
+    // hidden field just specifies the interval. If the page only supports
+    // one fixed frequency, this cannot be detected without a field.
+    if (!this.applyFieldValue("transaction.recurrfreq", frequency, true)) {
       this.log(
         `Could not set recurrfreq to "${frequency}" - cannot make a ${frequency.toLowerCase()} donation on this page`,
         "🔴"
