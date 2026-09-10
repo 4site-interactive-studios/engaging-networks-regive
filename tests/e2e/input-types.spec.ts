@@ -70,7 +70,7 @@ test("exits when the recurrfreq select has no option for the configured frequenc
   await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
 });
 
-test("exits instead of submitting when the chosen amount has no matching select option", async ({
+test("falls back to the other amount field when no select option matches", async ({
   page,
 }) => {
   await page.goto("/page/12345/selectsbad/2");
@@ -81,7 +81,24 @@ test("exits instead of submitting when the chosen amount has no matching select 
   await button.click();
 
   // $7 matches no option in the embedded page's donationAmt select (5.00 /
-  // 10.00), so the child exits rather than submitting the wrong amount
+  // 10.00), so it is submitted through the "other" free-text field
+  const echo = frame.locator("#echo");
+  await expect(echo).toBeAttached();
+  await expect(echo).toContainText("transaction.donationAmt.other=7.00");
+});
+
+test("exits when no option matches and there is no other amount field", async ({
+  page,
+}) => {
+  await page.goto("/page/12345/selectsnoother/2");
+
+  const frame = page.frameLocator("iframe.regive-iframe");
+  const button = frame.locator('.regive-amount-btn[data-amount="7"]');
+  await expect(button).toBeAttached();
+  await button.click();
+
+  // $7 matches no select option and the page has no "other" field, so the
+  // child exits rather than submitting the wrong amount
   await expect(page.locator(".regive-container")).toHaveCount(0);
   await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
 });

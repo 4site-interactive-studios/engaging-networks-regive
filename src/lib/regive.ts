@@ -1501,18 +1501,10 @@ export class Regive {
       parseFloat(this.ENgrid.getFieldValue("transaction.donationAmt")) !==
       target
     ) {
-      // No preset option matched. Fall back to the "other" free-text
-      // amount, but only when the main field is a radio group (EN's
-      // withOther pattern) or absent entirely. On a select or plain input
-      // the stale value cannot be cleared, so submitting would send two
-      // conflicting amounts.
-      const amountFields = document.querySelectorAll(
-        '[name="transaction.donationAmt"]'
-      );
-      const hasRadios = Array.from(amountFields).some(
-        (el) => el instanceof HTMLInputElement && el.type === "radio"
-      );
-      if (!otherField || (amountFields.length && !hasRadios)) {
+      // No preset option matched - fall back to the "other" free-text
+      // amount, whatever the main field's input type. EN gives the "other"
+      // amount precedence over a stale select selection or radio choice.
+      if (!otherField) {
         this.log(
           `Could not set the donation amount to ${target} - the field reads "${this.ENgrid.getFieldValue(
             "transaction.donationAmt"

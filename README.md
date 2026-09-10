@@ -69,7 +69,7 @@ The Regive component can be customized using various attributes on the `<regive>
 | `amount`       | Comma-separated list of donation amounts to display as buttons          | `amount="5,8,10"`                      | `"5"`              |
 | `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag) | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
 
-**Note:** If a chosen amount cannot be applied on the embedded donation page (e.g. it matches no option of a select-based amount field and the page has no "other" free-text amount), regive does not submit — the component exits instead of charging a different amount than the donor chose.
+**Note:** When a chosen amount matches no preset option on the embedded donation page (e.g. a select-based amount field without that value), it is submitted through the page's "other" free-text amount field. If the page has no "other" field, regive does not submit — the component exits instead of charging a different amount than the donor chose.
 
 ### Text Customization
 

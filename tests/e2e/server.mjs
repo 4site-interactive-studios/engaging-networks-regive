@@ -24,6 +24,8 @@ const routes = [
   // first-page route
   { pattern: /^\/page\/\d+\/selects(?:bad)?\/1$/, file: "fixtures/donate-1-selects.html" },
   { pattern: /^\/page\/\d+\/selectsnomonthly\/1$/, file: "fixtures/donate-1-selects-nomonthly.html" },
+  // Select-based amounts with no "other" free-text field
+  { pattern: /^\/page\/\d+\/selectsnoother\/1$/, file: "fixtures/donate-1-selects-noother.html" },
   // One-time-only first donation page (no recurrpay "Y" option) - must come
   // before the generic first-page route
   { pattern: /^\/page\/\d+\/monthly\/1$/, file: "fixtures/donate-1-norecurr.html" },
@@ -47,8 +49,10 @@ const routes = [
   // recurrpay but no recurrfreq; /selects/2 and /selectsnomonthly/2 embed
   // the select-based pages
   { pattern: /^\/page\/\d+\/(?:monthly(?:ok)?|nofields|nofreq|selects|selectsnomonthly)\/2$/, file: "fixtures/page-2-monthly.html" },
-  // Thank-you page with an amount that has no matching select option
-  { pattern: /^\/page\/\d+\/selectsbad\/2$/, file: "fixtures/page-2-amount7.html" },
+  // Thank-you pages with an amount that has no matching select option.
+  // /selectsbad/2 embeds the selects page (which has an "other" field);
+  // /selectsnoother/2 embeds the selects page without one
+  { pattern: /^\/page\/\d+\/(?:selectsbad|selectsnoother)\/2$/, file: "fixtures/page-2-amount7.html" },
   // Thank-you page with an unknown frequency on the <regive> tag
   { pattern: /^\/page\/\d+\/badfreq\/2$/, file: "fixtures/page-2-badfreq.html" },
   // Thank-you page with the <regive test="true"> tag
