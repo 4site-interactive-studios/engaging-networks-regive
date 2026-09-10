@@ -35,7 +35,7 @@ export interface RegiveOptions {
   /** Layout theme - If not part of the predefined themes, it will be used as a custom theme */
   theme?: string;
 
-  /** Source of the donation */
+  /** Source of the donation (saved in supporter.appealCode). Set to "original" to reuse the appeal code from the original gift */
   source?: string;
 
   /** Base page ID to process the donation through */
@@ -52,4 +52,10 @@ export interface RegiveOptions {
 
   /** Comma-separated list of mandatory field names to ignore when empty */
   ignoreRequiredFields?: string;
+
+  /** Donation frequency for the regive donation: "onetime" (default), "monthly", "quarterly", or "annual". Recurring day defaults to the current day. */
+  frequency?: string;
+
+  /** Comma-separated list of original gift frequencies for which regive should not be shown (e.g. "annual,monthly") */
+  hideForFrequency?: string;
 }

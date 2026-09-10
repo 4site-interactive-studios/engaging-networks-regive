@@ -69,13 +69,15 @@ The Regive component can be customized using various attributes on the `<regive>
 | `amount`       | Comma-separated list of donation amounts to display as buttons          | `amount="5,8,10"`                      | `"5"`              |
 | `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag) | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
 
+**Note:** When a chosen amount matches no preset option on the embedded donation page (e.g. a select-based amount field without that value), it is submitted through the page's "other" free-text amount field. If the page has no "other" field, regive does not submit — the component exits instead of charging a different amount than the donor chose.
+
 ### Text Customization
 
 | Option              | Description                                                  | Example                                                      | Default        |
 | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | -------------- |
 | `heading`           | Message displayed above the donation buttons                 | `heading="Double your impact today!"`                        | `null`         |
 | `thank-you-message` | Message shown after successful donation                      | `thank-you-message="Thank you for your additional support!"` | `"Thank You!"` |
-| `source`            | Source code for the donation (saved in supporter.appealCode) | `source="REGIVE-CHRISTMAS"`                                  | `"REGIVE"`     |
+| `source`            | Source code for the donation (saved in supporter.appealCode). Set to `original` to reuse the appeal code from the original gift | `source="REGIVE-CHRISTMAS"` or `source="original"` | `"REGIVE"`     |
 
 ### Visual Styling
 
@@ -109,6 +111,8 @@ Available themes:
 | `params`   | Additional URL parameters to pass to the iFrame | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`      |
 | `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
 | `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"` | `null` |
+| `frequency` | Donation frequency: `onetime`, `monthly`, `quarterly`, or `annual`. The recurring day defaults to the current day. Recurring donations via digital wallets depend on gateway support. If the configured frequency cannot be applied on the page (e.g. no recurring option, or an unknown value), regive does not load rather than submitting with a different frequency | `frequency="monthly"` | `"onetime"` |
+| `hide-for-frequency` | Comma-separated list of original gift frequencies for which regive should not be shown. The original gift's frequency is captured on page 1 | `hide-for-frequency="annual,monthly"` | `null` |
 
 #### Base Page Option
 
