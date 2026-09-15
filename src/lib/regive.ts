@@ -7,6 +7,8 @@ const cardMethods = ["card", "cards", "VI", "MC", "DS", "AX"];
 // Sanity ceiling for the gift amount - guards against garbage input (e.g. an
 // encoded merge tag leaking through) resolving to an absurd ask
 const maxGiftAmount = 100000;
+// Hard ceiling for an additional Regive donation, independent of gift eligibility
+const maxRegiveAmount = 100000;
 // Default gift used in test mode to preview dynamic asks when no real gift is
 // available (and no min-amount is set to preview the fallback state)
 const defaultTestGiftAmount = 50;
@@ -658,7 +660,11 @@ export class Regive {
     // Only apply theme rules if a positive gift amount is specified. In case we have a special theme for smaller amounts, it will be ignored if the gift amount is zero (implied unknown).
     let currentThreshold = -1;
     if (options.themeRules) {
-      if (isNaN(giftAmount) || giftAmount <= 0) {
+      if (
+        isNaN(giftAmount) ||
+        giftAmount <= 0 ||
+        giftAmount > maxGiftAmount
+      ) {
         this.log(
           "Theme rules are set but the gift amount is unavailable. Theme rules will be ignored.",
           "⚠️"
@@ -1309,6 +1315,12 @@ export class Regive {
     return parseFloat(value.replace(/[^0-9.]/g, ""));
   }
 
+  private isRegiveAmountAllowed(amount: string | number): boolean {
+    // Preserve the existing fixed-token and form amount parsing semantics.
+    const value = typeof amount === "number" ? amount : parseFloat(amount);
+    return Number.isFinite(value) && value > 0 && value <= maxRegiveAmount;
+  }
+
   // Format an amount button value as USD for the {{ask-amount}} merge tag:
   // "$5", "$5.01", "$1,250" — cents are included only when non-zero.
   // Falls back to the raw trimmed string if the amount isn't numeric.
@@ -1417,7 +1429,7 @@ export class Regive {
     for (const token of options.amount.split(",")) {
       if (token.includes("%")) continue;
       const fixedValue = parseFloat(token);
-      if (!isNaN(fixedValue) && fixedValue > 0) {
+      if (this.isRegiveAmountAllowed(fixedValue)) {
         fixedValues.add(fixedValue);
       }
     }
@@ -1454,6 +1466,13 @@ export class Regive {
         );
         // Guard against floating-point dust from the increment math
         value = Math.round(value * 100) / 100;
+        if (!this.isRegiveAmountAllowed(value)) {
+          this.log(
+            `Skipping invalid or over-limit amount: ${token} resolves to ${value} (maximum ${maxRegiveAmount})`,
+            "⚠️"
+          );
+          continue;
+        }
         if (fixedValues.has(value) || resolvedPercentages.has(value)) {
           this.log(
             `Skipping duplicate amount: ${token} resolves to ${value}, which is already in the list`,
@@ -1463,10 +1482,13 @@ export class Regive {
         }
         resolvedPercentages.add(value);
         resolved.push(value.toString());
-      } else if (!isNaN(value) && value > 0) {
+      } else if (this.isRegiveAmountAllowed(value)) {
         resolved.push(token.trim());
       } else {
-        this.log(`Skipping invalid amount: ${token}`, "⚠️");
+        this.log(
+          `Skipping invalid or over-limit amount: ${token} (maximum ${maxRegiveAmount})`,
+          "⚠️"
+        );
       }
     }
     options.amount = resolved.join(",");
@@ -1627,6 +1649,13 @@ export class Regive {
     }
   }
   private setAmount(amount: string) {
+    if (!this.isRegiveAmountAllowed(amount)) {
+      this.log(
+        `Not setting invalid or over-limit amount (maximum ${maxRegiveAmount})`,
+        "⚠️"
+      );
+      return;
+    }
     // Run only if it is a Donation Page with a Donation Amount field
     if (!document.getElementsByName("transaction.donationAmt").length) {
       return;
@@ -1680,6 +1709,13 @@ export class Regive {
     }
   }
   private submitForm(amount: string) {
+    if (!this.isRegiveAmountAllowed(amount)) {
+      this.log(
+        `Not submitting invalid or over-limit amount (maximum ${maxRegiveAmount})`,
+        "⚠️"
+      );
+      return;
+    }
     this.log("Submitting form with amount", "💰", { amount });
     this.sendMessageToParent("loading");
     if (this.hasCaptcha() && !this.isCaptchaUnlocked) {

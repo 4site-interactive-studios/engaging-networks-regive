@@ -59,11 +59,12 @@ Built-in themes: `stacked`, `button-right`, `button-left`, `button-top`. Custom 
 `processAmounts` (in `regive.ts`) resolves the `amount` attribute before the banner renders. Each comma-separated token is either a fixed amount or a percentage (`50%`) of the donor's gift.
 
 - **Gift resolution:** `gift-amount` attribute first, falling back to `localStorage("regive-donation-amt")` saved on the first page. The normalized gift is written back to `options.giftAmount` even when no `amount` attribute exists, so theme rules always see a clean number.
-- **Shared parser:** All amount parsing goes through the `parseAmount` method — it strips currency formatting (`"$1,250.00"` → `1250`) and rejects unresolved merge tags, including URL-encoded braces (`%7B`/`%7D`). Never add a second parser (a divergent `parseFloat` in `getTheme` was a past bug). US-style number formats only; European formats like `€1.250,00` are unsupported.
-- **Sanity ceiling:** Gift amounts above `maxGiftAmount` ($100,000) are treated as unavailable, guarding against garbage input producing absurd asks.
-- **Fixed amounts pass through verbatim:** original order, duplicates, and formatting (`5.00`) are preserved. Only percentage-resolved amounts are deduped — against fixed amounts (numeric comparison) and each other.
+- **Shared gift parser:** Gift, guardrail, and theme-rule inputs use `parseAmount` — it strips currency formatting (`"$1,250.00"` → `1250`) and rejects unresolved merge tags, including URL-encoded braces (`%7B`/`%7D`). Fixed-token and form-amount validation deliberately retains the established `parseFloat` semantics. Never parse `giftAmount` separately in theme selection (a divergent `parseFloat` there was a past bug). US-style number formats only; European formats like `€1.250,00` are unsupported.
+- **Ceilings:** Initial gifts above `maxGiftAmount` (`100000`) are treated as unavailable. `maxRegiveAmount` is inclusive: an additional ask of exactly `100000` is allowed; fixed or percentage-calculated asks over `100000` are skipped before rendering and submission.
+- **Amount order and deduplication:** Fixed tokens preserve their authored order, duplicates, and formatting (`5.00`). Percentage tokens resolve in place and are omitted when they duplicate a fixed amount (numeric comparison) or an earlier calculated result, so fewer buttons may render.
+- **Missing gift:** When no usable gift amount is available, an explicit `min-amount` provides the fallback for percentage tokens; otherwise percentage tokens are skipped. Test mode's default `$50` preview gift remains the exception when no gift and no explicit `min-amount` are available.
 - **Guardrails & rounding:** Percentages are clamped by `min-amount`/`max-amount` (which apply only to percentages) and rounded up per `rounding-tiers` (default `0:1,50:5`, tier chosen by gift amount). Values are rounded to cents before tier math so floating-point dust can't jump a step.
-- **Empty result:** If every token is skipped or invalid, `options.amount` is deleted so the consumer's `|| ["5"]` default kicks in — never leave an empty string behind (`"".split(",")` renders a broken button).
+- **Empty result:** If every token is skipped or invalid, `options.amount` is deleted so the consumer's `|| ["5"]` default (the established `$5` ask) kicks in — never leave an empty string behind (`"".split(",")` renders a broken button).
 - **Test-mode preview gift:** In test mode with no gift available and no `min-amount` set, a default preview gift (`defaultTestGiftAmount`, $50) drives percentages and theme rules so dynamic asks render realistically. Setting `min-amount` explicitly previews the fallback state instead.
 - Debug logs state where the gift amount came from (attribute vs. localStorage).
 
@@ -129,6 +130,8 @@ Fixtures drift silently, so update them in the same commit as the change:
 ### Theme fixtures
 
 `test-page-1.html` holds five custom themes: `test-theme` as a minimal reference, and the `tier-*` ladder for theme rules (`tier-supporter` as the base tier, `tier-sustainer` $100+, `tier-leader` $500+, `tier-champion` $1,000+). Panel presets apply the matching `theme-rules` string and step the gift across the thresholds.
+
+The fixture panel also has direct `$49.99` and `$50` gift controls for checking the default `0:1,50:5` rounding-tier boundary.
 
 Two conventions in those templates are worth preserving:
 

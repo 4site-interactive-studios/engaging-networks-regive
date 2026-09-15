@@ -77,7 +77,9 @@ The Regive component can be customized using various attributes on the `<regive>
 
 #### About Percentages
 
-Percentages allow you to specify donation amounts as a percentage of the user's previous gift. For example, `amount="50%"` will set the donation amount to 50% of the user's last gift (A user gifts $50, the Regive box would then ask for $25). You can mix percentage amounts with fixed amounts ie. `amount="50%,10,35"` - amounts will be sorted from least to greatest after percentage calculations.
+Percentages allow you to specify donation amounts as a percentage of the user's previous gift. For example, `amount="50%"` will set the donation amount to 50% of the user's last gift (A user gifts $50, the Regive box would then ask for $25). You can mix percentage amounts with fixed amounts ie. `amount="50%,10,35"`. Fixed tokens preserve their authored order, duplicates, and formatting. Percentage tokens resolve in place and are omitted if their calculated value duplicates a fixed amount or an earlier calculated result, so fewer buttons may render.
+
+When no usable initial gift is available, an explicit `min-amount` provides the fallback for percentage tokens; otherwise percentage tokens are skipped, except for the test-mode preview behavior described below. If no valid amount remains, the established `$5` default applies. Initial gifts over `100000` are treated as unavailable. An additional Regive ask of exactly `100000` is allowed; fixed or calculated asks over `100000` are skipped, so they are not rendered or submitted.
 
 ### Text Customization
 
@@ -116,7 +118,7 @@ Theme rules are values paired between colons (`:`) and separated by commas.
 
 For example, the rule `500:large-donor,1000:major-donor` means that if the gift amount is 500 or more, the `large-donor` theme will be applied, and if the gift amount is 1000 or more, the `major-donor` theme will be applied. Any gift amount below the first threshold will use the theme specified by the `theme` attribute or the default built-in theme, if no `theme` attribute is provided.
 
-By default, there are no theme rules applied, and the component will use the theme specified by the `theme` attribute or the default built-in theme if no `theme` attribute is provided. If a rule names a theme that doesn't exist (neither a built-in theme nor a <template> on the page), the component falls back to the theme attribute, and finally to the default `stacked` theme, logging a warning in debug mode.
+By default, there are no theme rules applied, and the component will use the theme specified by the `theme` attribute or the default built-in theme if no `theme` attribute is provided. If a rule names a theme that doesn't exist (neither a built-in theme nor a `<template>` on the page), the component falls back to the theme attribute, and finally to the default `stacked` theme, logging a warning in debug mode.
 
 ### Advanced Options
 
@@ -504,7 +506,7 @@ Harness settings are separate from the tag's attributes. They live in URL parame
 | `tier-leader`    | $500+                           |
 | `tier-champion`  | $1,000+                         |
 
-The "tier ladder" preset in the panel wires them up as `theme="tier-supporter"` with `theme-rules="100:tier-sustainer,500:tier-leader,1000:tier-champion"`. The row of gift amounts next to it steps a donor gift across the thresholds, and the readout names the template that rendered, so you can confirm the rule that won rather than inferring it from the layout. Two presets cover the awkward cases: "broken rule" points a rule at a theme that does not exist so you can watch the fallback chain, and "no rules" clears them.
+The "tier ladder" preset in the panel wires them up as `theme="tier-supporter"` with `theme-rules="100:tier-sustainer,500:tier-leader,1000:tier-champion"`. The row of gift amounts next to it steps a donor gift across the thresholds; its direct `$49.99` and `$50` controls are useful for checking the default `0:1,50:5` rounding-tier boundary. The readout names the template that rendered, so you can confirm the rule that won rather than inferring it from the layout. Two presets cover the awkward cases: "broken rule" points a rule at a theme that does not exist so you can watch the fallback chain, and "no rules" clears them.
 
 Remember that test mode substitutes its $50 preview gift when no gift amount is available, so rules still evaluate against $50. Setting `min-amount` previews the fallback state instead, and rules are ignored there.
 
