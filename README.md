@@ -26,6 +26,12 @@ No third-party libraries are required, and the component is fully customizable t
     - [.showif-regive-enabled](#showif-regive-enabled)
     - [.showif-regive-success](#showif-regive-success)
   - [Regive Examples](#regive-examples)
+  - [Local Test Pages](#local-test-pages)
+    - [Running the pages](#running-the-pages)
+    - [The two paths through the component](#the-two-paths-through-the-component)
+    - [Panel controls](#panel-controls)
+    - [Testing theme rules](#testing-theme-rules)
+    - [What the pages fake](#what-the-pages-fake)
   - [Development](#development)
 
 ## Installation
@@ -64,10 +70,16 @@ The Regive component can be customized using various attributes on the `<regive>
 
 ### Amount Options
 
-| Option         | Description                                                             | Example                                | Default            |
-| -------------- | ----------------------------------------------------------------------- | -------------------------------------- | ------------------ |
-| `amount`       | Comma-separated list of donation amounts to display as buttons          | `amount="5,8,10"`                      | `"5"`              |
-| `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag) | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
+| Option         | Description                                                                   | Example                                | Default            |
+| -------------- | ----------------------------------------------------------------------------- | -------------------------------------- | ------------------ |
+| `amount`       | Comma-separated list of donation amounts or percentages to display as buttons | `amount="5,8,10"`                      | `"5"`              |
+| `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag)       | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
+
+#### About Percentages
+
+Percentages allow you to specify donation amounts as a percentage of the user's previous gift. For example, `amount="50%"` will set the donation amount to 50% of the user's last gift (A user gifts $50, the Regive box would then ask for $25). You can mix percentage amounts with fixed amounts ie. `amount="50%,10,35"`. Fixed tokens preserve their authored order, duplicates, and formatting. Percentage tokens resolve in place and are omitted if their calculated value duplicates a fixed amount or an earlier calculated result, so fewer buttons may render.
+
+When no usable initial gift is available, an explicit `min-amount` provides the fallback for percentage tokens; otherwise percentage tokens are skipped, except for the test-mode preview behavior described below. If no valid amount remains, the established `$5` default applies. Initial gifts over `100000` are treated as unavailable. An additional Regive ask of exactly `100000` is allowed; fixed or calculated asks over `100000` are skipped, so they are not rendered or submitted.
 
 ### Text Customization
 
@@ -91,6 +103,7 @@ The Regive component can be customized using various attributes on the `<regive>
 | Option  | Description                           | Example                | Default     |
 | ------- | ------------------------------------- | ---------------------- | ----------- |
 | `theme` | Layout theme for the regive component | `theme="button-right"` | `"stacked"` |
+| `theme-rules` | Define which theme is used based on gift amount | `theme-rules="500:large-donor,1000:major-donor"` | `null` |
 
 Available themes:
 
@@ -99,22 +112,46 @@ Available themes:
 - `button-left`: Buttons on left, heading on right
 - `button-top`: Heading on top, buttons below
 
+#### About theme rules
+
+Theme rules are values paired between colons (`:`) and separated by commas.
+
+For example, the rule `500:large-donor,1000:major-donor` means that if the gift amount is 500 or more, the `large-donor` theme will be applied, and if the gift amount is 1000 or more, the `major-donor` theme will be applied. Any gift amount below the first threshold will use the theme specified by the `theme` attribute or the default built-in theme, if no `theme` attribute is provided.
+
+By default, there are no theme rules applied, and the component will use the theme specified by the `theme` attribute or the default built-in theme if no `theme` attribute is provided. If a rule names a theme that doesn't exist (neither a built-in theme nor a `<template>` on the page), the component falls back to the theme attribute, and finally to the default `stacked` theme, logging a warning in debug mode.
+
 ### Advanced Options
 
-| Option     | Description                                     | Example                                                               | Default     |
-| ---------- | ----------------------------------------------- | --------------------------------------------------------------------- | ----------- |
-| `confetti` | Enable/disable confetti or set custom colors    | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"` |
-| `test`     | Enable test mode without actual form submission | `test="true"`                                                         | `false`     |
-| `digital-wallets` | Enable digital wallet payment methods | `digital-wallets="true"` | `false` |
-| `params`   | Additional URL parameters to pass to the iFrame | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`      |
-| `base-page` | EN page ID to process the donation through    | `base-page="12345"`                                                     | Same as original donation page |
-| `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"` | `null` |
+| Option                   | Description                                                        | Example                                                               | Default                        |
+| ------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------ |
+| `confetti`               | Enable/disable confetti or set custom colors                       | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"`                    |
+| `test`                   | Enable test mode without actual form submission                    | `test="true"`                                                         | `false`                        |
+| `digital-wallets`        | Enable digital wallet payment methods                              | `digital-wallets="true"`                                              | `false`                        |
+| `params`                 | Additional URL parameters to pass to the iFrame                    | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`                         |
+| `base-page`              | EN page ID to process the donation through                         | `base-page="12345"`                                                   | Same as original donation page |
+| `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"`  | `null`                         |
+| `gift-amount`            | Insert for the amount the supporter initially gave                 | `gift-amount="{receipt_data~amount~[en1]}"`                           | `null`                         |
+| `min-amount`             | Minimum amount for a percentage gift to be                         | `min-amount="1"`                                                      | `1`                            |
+| `max-amount`             | Maximum amount for a percentage gift amount to be                  | `max-amount="100"`                                                    | `null`                         |
+| `rounding-tiers`         | Comma-separated list of rounding tiers for percentage gifts        | `rounding-tiers="0:1,50:5"`                                           | `0:1,50:5`                     |
 
 #### Base Page Option
 
 By default, Regive processes the additional donation through the same page as the original donation. However, you can specify a different base page for processing the regive donation using the `base-page` attribute. This allows you to route the additional donation through a specific page that may have different settings, configurations, or tracking parameters. In this case, the `base-page` should be set to the page ID of the desired page in Engaging Networks.
 
 **Note:** When using the `base-page` option, make sure that the specified page is properly set up to handle the donation (Contains all necessary fields for Engaging Networks to process the donation), and that it has the Regive script included on both pages. All instructions for "Page 1" of the donation form (such as adding the custom theme template) should be followed for the specified base page.
+
+#### Min and Max Amounts
+
+The values for min and max amounts only apply to percentage/dynamic amounts.
+
+#### Gift Amount Format
+
+The `gift-amount` attribute and the amounts (`min-amount`, `max-amount`, `rounding-tiers`) expect US-style number formatting (e.g. `gift-amount="$1,250.00"`). European-style formats (e.g. `€1.250,00`) are not currently supported - a value like that will not parse as intended.
+
+#### Rounding tiers
+
+Rounding tiers are groups of amounts and rounding rules for percentage gifts. Each tier is defined by a minimum amount and the rounding increment. For example, `rounding-tiers="0:1,50:5"` means that amounts from 0 to 49 will be rounded up, and amounts from 50 onwards will be rounded up to the next $5 increment. The tiers are calculated based on gift amount, not calculated amounts.
 
 ## Custom Theming
 
@@ -161,15 +198,18 @@ You can create custom themes by:
 
 The following merge tags can be used in custom templates:
 
-| Merge Tag              | Description                  |
-| ---------------------- | ---------------------------- |
-| `{{heading}}`          | Inserts the heading content  |
-| `{{button}}`           | Inserts the donation buttons |
-| `{{theme}}`            | The current theme name       |
-| `{{bg-color}}`         | The background color         |
-| `{{txt-color}}`        | The text color               |
-| `{{button-bg-color}}`  | The button background color  |
-| `{{button-txt-color}}` | The button text color        |
+| Merge Tag              | Description                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `{{heading}}`          | Inserts the heading content                                                                               |
+| `{{button}}`           | Inserts the donation buttons                                                                              |
+| `{{ask-amount}}`       | The first (or only) amount button's value, formatted in USD (e.g. `$5`, `$5.01`, `$1,250`)                |
+| `{{theme}}`            | The current theme name                                                                                    |
+| `{{bg-color}}`         | The background color                                                                                      |
+| `{{txt-color}}`        | The text color                                                                                            |
+| `{{button-bg-color}}`  | The button background color                                                                               |
+| `{{button-txt-color}}` | The button text color                                                                                     |
+
+`{{ask-amount}}` is replaced everywhere in the template, including inside `<style>` blocks and CSS pseudo-element `content` values.
 
 Additionally, the `{{amount}}` merge tag can be used in the `button-label` attribute to include the donation amount in the button text.
 
@@ -193,6 +233,24 @@ When test mode is enabled:
 - No actual donation will be processed
 - The submission will reset after 8 seconds
 
+### Previewing dynamic (percentage) asks
+
+In test mode, percentage amounts need a gift amount to calculate against. You can preview a specific donor gift with the `gift-amount` attribute — the full pipeline (guardrails, rounding tiers, dedupe, and theme rules) runs from that value:
+
+```html
+<!-- Previews a $500 donor without a real donation -->
+<regive amount="20%,50%" gift-amount="500" test="true"></regive>
+```
+
+If no gift amount is available (no `gift-amount` attribute and no stored donation), test mode uses a **default preview gift of $50** so dynamic asks render realistically. To preview the fallback state instead (percentages resolved against the minimum), set `min-amount` explicitly:
+
+```html
+<!-- Previews the fallback state: both buttons resolve to the $5 minimum -->
+<regive amount="20%,50%" min-amount="5" test="true"></regive>
+```
+
+Changing the `gift-amount` value updates both the amount buttons and the theme selected by `theme-rules`.
+
 **Test mode is useful for:**
 
 - Verifying your configuration
@@ -205,14 +263,15 @@ When test mode is enabled:
 You can also specify a payment method to test using the `test-method` attribute. This allows you to simulate how the Regive component behaves with different payment methods (e.g., card, Apple Pay, Google Pay) without needing to go through the actual payment process. Test must be enabled to use this feature. **NOTE:** Methods other than `card` are unable to simulate the test celebration process, they will submit to the form with an actual transaction.
 
 ```html
-<regive amount="5" test="true" test-method="stripedigitalwallets"></regive>
+<regive amount="5" test="true" test-method="stripedigitalwallet"></regive>
 ```
 
 Accepted values for `test-method` include:
+
 - `card`
 - `applepay`
 - `googlepay`
-- `stripedigitalwallets`
+- `stripedigitalwallet`
 - `paypaltouch`
 - `daf`
 
@@ -374,6 +433,95 @@ Here's a more complex example with custom theming and test mode:
 </regive>
 ```
 
+Here's an example of a regive block with dynamic amounts:
+
+```html
+<regive
+  amount="8,15,25%,50%"
+  gift-amount="{receipt_data~amount~[en1]}"
+  min-amount="1"
+  max-amount="100"
+  button-label="give {{amount}} more"
+  heading="Adopt a kitten today!"
+  thank-you-message="You have a new furry friend! 🐱"
+  theme="kitten-theme"
+  test="true"
+>
+</regive>
+```
+
+## Local Test Pages
+
+The repo ships a pair of static pages that stand in for an Engaging Networks donation form and its Thank You page, so you can run Regive end to end without an Engaging Networks account:
+
+- `test-page-1.html` is the mock donation form (page 1 of 2). It carries the Regive script, the VGS token fields, the mandatory supporter fields, and the custom theme `<template>` elements.
+- `test-thank-you.html` is the mock Thank You page (page 2 of 2). It carries the `<regive>` tag and a panel for editing every attribute without touching the file.
+
+Both pages mirror the field names, class names, and `pageJson` values the component queries, so Regive takes the same code paths it takes on a real page. They are local fixtures for development, not something to upload to Engaging Networks.
+
+### Running the pages
+
+1. Build the bundle the pages load:
+   ```bash
+   npm run build
+   ```
+2. Serve the repo root over HTTP:
+   ```bash
+   python3 -m http.server 8000
+   ```
+3. Open `http://localhost:8000/test-thank-you.html`
+
+`npm run dev` works as well; open the same filenames on the Vite port (`http://localhost:5173/test-thank-you.html`). Opening the files over `file://` does not work: Regive needs localStorage and a same-origin iframe, both of which browsers block there.
+
+### The two paths through the component
+
+Test mode is on by default in `test-thank-you.html`, so the banner renders on load, and clicking an amount simulates the donation, celebrates, and resets after 8 seconds. Nothing is submitted and no card is needed. This is the fast path for checking layout, themes, amounts, and copy.
+
+For the real submission path, turn test mode off and start on page 1. Write the card tokens, submit, and land on the Thank You page. Clicking an amount there submits the chained form, the iframe navigates to the Thank You page the way Engaging Networks would, and Regive matches its stored `regive-submitted` flag before reporting success to the parent.
+
+### Panel controls
+
+The panel on the Thank You page edits every `<regive>` attribute, rewrites the URL, and shows the tag it produced, ready to paste into an Engaging Networks code block. It also logs the `postMessage` traffic coming out of the embed, lists the `regive-*` localStorage keys, and names the theme Regive settled on.
+
+Harness settings are separate from the tag's attributes. They live in URL parameters and persist in localStorage under `regive-test-harness`, so the chained iframe inherits them:
+
+| Parameter  | Default          | What it does                                                                                |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------------- |
+| `debug`    | `1`              | Appends `?debug` to the script source in both frames                                        |
+| `script`   | `dist/regive.js` | Which bundle to load, so you can point at `dist/regive.min.js` to test the production file   |
+| `currency` | `USD`            | Selects `transaction.paycurrency`, which sets the currency symbol on the buttons             |
+| `captcha`  | `0`              | Renders a mock reCAPTCHA, with a button that fires the callback Regive wraps                 |
+| `wallets`  | `0`              | Renders a mock `#en__digitalWallet` block and a Stripe `paymentRequest` stub                  |
+| `prefill`  | `1`              | Fills the mandatory supporter fields in the chained iframe, standing in for session prefill   |
+| `fail`     | `0`              | Fakes a failed Engaging Networks submission, so you can watch Regive exit                    |
+
+### Testing theme rules
+
+`test-page-1.html` carries a ladder of four custom themes built for exercising `theme-rules`:
+
+| Template id      | Tier                            |
+| ---------------- | ------------------------------- |
+| `tier-supporter` | Base tier, below every threshold |
+| `tier-sustainer` | $100+                           |
+| `tier-leader`    | $500+                           |
+| `tier-champion`  | $1,000+                         |
+
+The "tier ladder" preset in the panel wires them up as `theme="tier-supporter"` with `theme-rules="100:tier-sustainer,500:tier-leader,1000:tier-champion"`. The row of gift amounts next to it steps a donor gift across the thresholds; its direct `$49.99` and `$50` controls are useful for checking the default `0:1,50:5` rounding-tier boundary. The readout names the template that rendered, so you can confirm the rule that won rather than inferring it from the layout. Two presets cover the awkward cases: "broken rule" points a rule at a theme that does not exist so you can watch the fallback chain, and "no rules" clears them.
+
+Remember that test mode substitutes its $50 preview gift when no gift amount is available, so rules still evaluate against $50. Setting `min-amount` previews the fallback state instead, and rules are ignored there.
+
+All five templates on page 1, the four tiers plus a minimal `test-theme`, print `{{ask-amount}}` twice: once in their copy, once from a CSS pseudo-element. The panel reads both values back, which covers the substitution surviving inside a `<style>` block. Built-in themes get no `{{ask-amount}}` substitution, and the readout says so when one is active.
+
+### What the pages fake
+
+Three behaviors have no static equivalent, so the pages simulate them. Each one is commented where it happens:
+
+- **Session prefill.** Engaging Networks repopulates the supporter fields on the chained page from the donor's session. The pages replay whatever page 1 submitted. Set `prefill=0` with test mode off to watch Regive refuse to render on empty required fields.
+- **DOM mutations.** Regive re-reads the form whenever the DOM changes, and real Engaging Networks pages change it constantly. The pages stamp a data attribute on the form after any scripted value change, because setting an input's `value` property produces no mutation record on its own.
+- **The iframe URL.** Regive normally rewrites the `/page/<id>/donate/<n>` path back to `/1` to find page 1. These files have no such path, so the panel sets `base-page` to page 1's absolute URL.
+
+The mock wallet block is thinner than the rest. Moving the wallet UI into the banner and attaching the Stripe submit listener both run, but no gateway is involved: a placeholder iframe satisfies the "wallet UI is ready" check, and since the component hides iframes in the embedded frame, only the mock button stays visible.
+
 ## Development
 
 1. Clone the repository
@@ -385,7 +533,7 @@ Here's a more complex example with custom theming and test mode:
    ```bash
    npm run dev
    ```
-4. Open your browser and navigate to `http://localhost:3000`
+4. Open a test page on the Vite port, for example `http://localhost:5173/test-thank-you.html` (see [Local Test Pages](#local-test-pages)). There is no index page at the root
 5. Open the console to see debug messages
 6. Build for production
    ```bash

@@ -1,0 +1,1270 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Regive test — EN mock donation page (1 of 2)</title>
+
+    <!--
+      ==========================================================================
+      REGIVE TEST HARNESS — PAGE 1 (the donation form)
+      ==========================================================================
+
+      This file fakes just enough of an Engaging Networks donation page for
+      dist/regive.js to run against, so Regive can be exercised without an EN
+      account. Its companion is test-thank-you.html.
+
+      HOW TO RUN
+        1. npm run build                     (creates dist/regive.js)
+        2. python3 -m http.server 8000       (from the repo root; any static
+                                              server works, so does `npx vite`)
+        3. open http://localhost:8000/test-page-1.html
+           Do NOT open these files over file:// — Regive needs localStorage and
+           a same-origin iframe, both of which browsers block on file://.
+
+      WHAT THIS FILE PLAYS
+        * Standalone (opened directly): Regive's "first page" role. It clears
+          stored tokens and watches the form for VGS tokens. Use the harness
+          panel to fake a card entry and a submission.
+        * Inside an iframe with ?chain (loaded by test-thank-you.html): Regive's
+          "chained/embedded" role. It hides the page, renders the amount
+          buttons, writes the stored tokens into the hidden card fields, and
+          submits on click.
+
+      HARNESS URL PARAMS (stored in localStorage under "regive-test-harness",
+      so the chained iframe and the thank-you page inherit them)
+        debug=1|0     append ?debug to the Regive script src (default 1)
+        script=PATH   which bundle to load (default dist/regive.js)
+        currency=USD  select transaction.paycurrency (USD|EUR|GBP|CAD)
+        captcha=1     render a mock .en__captcha / .g-recaptcha block
+        wallets=1     render a mock #en__digitalWallet block + Stripe stub
+        prefill=1     prefill mandatory supporter fields in the chained iframe,
+                      standing in for EN's session prefill (default 1). Set 0
+                      with test mode off to watch Regive bail out on empty
+                      required fields — test mode skips that enforcement.
+        fail=1        fake a failed EN submission (.en__errorList +
+                      enjs.checkSubmissionFailed) to test the exit path
+
+      THEME TEMPLATES ON THIS PAGE (custom themes must live here, on page 1,
+      because this is the document Regive renders the banner into)
+        test-theme        minimal reference theme, uses every merge tag
+        tier-supporter    the ladder's base tier, for gifts under the first rule
+        tier-sustainer    $100+
+        tier-leader       $500+
+        tier-champion     $1,000+
+      The four tier-* templates exist to exercise theme-rules, e.g.
+        theme="tier-supporter"
+        theme-rules="100:tier-sustainer,500:tier-leader,1000:tier-champion"
+      Each one is visually distinct, prints the resolved {{theme}}, and renders
+      {{ask-amount}} twice: once in the copy and once from a CSS
+      pseudo-element, which is the case Regive's raw-string replacement covers.
+      Built-in themes (stacked, button-right, button-left, button-top) do not
+      get {{ask-amount}} — the merge tag is a custom-template feature.
+
+      NOTE: everything with a "harness" class or id is scaffolding, not part of
+      the component. The mock EN markup below mirrors real EN field names and
+      class names, because that is what src/lib/engrid.ts queries.
+    -->
+
+    <script>
+      // ---- harness config (shared verbatim with test-thank-you.html) --------
+      const HARNESS_KEY = "regive-test-harness";
+      const HARNESS_DEFAULTS = {
+        debug: "1",
+        script: "dist/regive.js",
+        currency: "USD",
+        captcha: "0",
+        wallets: "0",
+        prefill: "1",
+        fail: "0",
+      };
+      const harnessOn = (value) =>
+        ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+
+      // URL params win, then whatever a previous harness page stored, then the
+      // defaults. The merged result is stored again so the chained iframe (which
+      // Regive loads with only ?chain and regive-* params) inherits the setup.
+      const harness = (() => {
+        let stored = {};
+        try {
+          stored = JSON.parse(localStorage.getItem(HARNESS_KEY) || "{}");
+        } catch (e) {
+          stored = {};
+        }
+        const config = Object.assign({}, HARNESS_DEFAULTS, stored);
+        const params = new URLSearchParams(location.search);
+        Object.keys(HARNESS_DEFAULTS).forEach((key) => {
+          if (params.has(key)) config[key] = params.get(key) || "1";
+        });
+        try {
+          localStorage.setItem(HARNESS_KEY, JSON.stringify(config));
+        } catch (e) {
+          /* private mode — carry on with in-memory config */
+        }
+        return config;
+      })();
+
+      // ---- the two globals ENGrid reads ------------------------------------
+      // pageJson drives getPageType/getPageNumber/getPageCount/getPageID.
+      // campaignPageId must match test-thank-you.html, exactly as it does
+      // across the pages of one real EN campaign — Regive compares it against
+      // the "regive-submitted" flag it wrote before submitting.
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 1,
+        pageCount: 2,
+        campaignPageId: 999999,
+        clientId: 12345,
+        giftProcess: false,
+      };
+
+      window.EngagingNetworks = {
+        require: {
+          _defined: {
+            enjs: {
+              // Regive treats a true return here as a server-side failure.
+              checkSubmissionFailed: () => harnessOn(harness.fail),
+            },
+          },
+        },
+        // Only read when transaction.feeCover is checked.
+        feeCover: { feeCover: { type: "PERCENT", percent: 3, additionalAmount: 0 } },
+        dependencies: [],
+      };
+    </script>
+
+    <style>
+      /* ---- harness chrome (none of this is part of Regive) ---------------- */
+      body {
+        margin: 0;
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #16202c;
+        background: #eef1f5;
+      }
+      .harness {
+        box-sizing: border-box;
+        background: #10151c;
+        color: #e7ecf3;
+        padding: 12px 16px 16px;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .harness h1 {
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin: 0 0 4px;
+        color: #ffd479;
+      }
+      .harness a {
+        color: #7cc4ff;
+      }
+      .harness fieldset {
+        border: 1px solid #2c3846;
+        border-radius: 6px;
+        margin: 10px 0 0;
+        padding: 8px 10px 10px;
+      }
+      .harness legend {
+        color: #9fb3c8;
+        padding: 0 4px;
+      }
+      .harness label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin: 2px 10px 2px 0;
+      }
+      .harness input[type="text"],
+      .harness select {
+        font: inherit;
+        padding: 2px 4px;
+        border: 1px solid #3a4757;
+        border-radius: 4px;
+        background: #1b2330;
+        color: #e7ecf3;
+      }
+      .harness button {
+        font: inherit;
+        cursor: pointer;
+        padding: 4px 10px;
+        margin: 4px 6px 0 0;
+        border: 1px solid #3a4757;
+        border-radius: 4px;
+        background: #26303d;
+        color: #e7ecf3;
+      }
+      .harness button:hover {
+        background: #33404f;
+      }
+      .harness button.harness-primary {
+        background: #1d6f42;
+        border-color: #298d56;
+      }
+      .harness table {
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 640px;
+      }
+      .harness th,
+      .harness td {
+        text-align: left;
+        padding: 2px 8px 2px 0;
+        border-bottom: 1px solid #232d3a;
+        vertical-align: top;
+      }
+      .harness th {
+        color: #9fb3c8;
+        font-weight: normal;
+        white-space: nowrap;
+      }
+      .harness td {
+        color: #b6f2c8;
+        word-break: break-all;
+      }
+      .harness td.harness-empty {
+        color: #5b6979;
+      }
+      .harness-role {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: #33404f;
+        color: #ffd479;
+      }
+      .harness-note {
+        color: #9fb3c8;
+        margin: 6px 0 0;
+        max-width: 90ch;
+      }
+
+      /* ---- mock EN page ---------------------------------------------------- */
+      .en__component--page {
+        max-width: 620px;
+        margin: 24px auto;
+        padding: 24px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      }
+      .en__field {
+        margin: 0 0 16px;
+      }
+      .en__field__label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .en__mandatory > .en__field__label::after {
+        content: " *";
+        color: #c0392b;
+      }
+      .en__field__input--text,
+      .en__field__input--select {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 8px;
+        font: inherit;
+        border: 1px solid #c3ccd6;
+        border-radius: 4px;
+      }
+      .en__field__element--radio {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .en__field__item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .en__field--donationAmt .en__field__item {
+        border: 1px solid #c3ccd6;
+        border-radius: 4px;
+        padding: 6px 10px;
+      }
+      .en__submit button {
+        font: inherit;
+        font-weight: 600;
+        padding: 12px 20px;
+        border: 0;
+        border-radius: 4px;
+        background: #007bff;
+        color: #fff;
+        cursor: pointer;
+      }
+      .en__errorList {
+        margin: 0 0 16px;
+        padding: 12px 12px 12px 32px;
+        background: #fdecea;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        color: #a3252a;
+      }
+      .en__captcha {
+        padding: 12px;
+        border: 1px dashed #9fb3c8;
+        border-radius: 4px;
+      }
+      .g-recaptcha button,
+      #en__digitalWallet button {
+        font: inherit;
+        margin: 4px 6px 0 0;
+        padding: 8px 12px;
+        border: 1px solid #9fb3c8;
+        border-radius: 4px;
+        background: #f4f6f9;
+        cursor: pointer;
+      }
+      #en__digitalWallet {
+        padding: 12px;
+        border: 1px dashed #9fb3c8;
+        border-radius: 4px;
+      }
+      .harness-hint {
+        color: #6a7887;
+        font-size: 12px;
+        margin: 4px 0 0;
+      }
+    </style>
+  </head>
+
+  <body class="en__donationPage">
+    <!-- =====================================================================
+         HARNESS PANEL — scaffolding only. Regive's hideAll() hides every body
+         child in the chained iframe, this panel included, which is why it
+         disappears once the iframe renders the banner.
+         ================================================================== -->
+    <div class="harness" id="harness">
+      <h1>Regive harness — page 1 (donation form)</h1>
+      <div>
+        role: <span class="harness-role" id="harness-frame-role">standalone</span>
+        &nbsp;|&nbsp; script: <span id="harness-script-src"></span>
+        &nbsp;|&nbsp; page: donation 1 of 2, campaignPageId 999999
+        &nbsp;|&nbsp; <a href="test-thank-you.html">thank-you page →</a>
+      </div>
+
+      <fieldset>
+        <legend>harness config (reloads the page)</legend>
+        <label><input type="checkbox" id="cfg-debug" /> debug</label>
+        <label><input type="checkbox" id="cfg-captcha" /> captcha</label>
+        <label><input type="checkbox" id="cfg-wallets" /> digital wallets</label>
+        <label><input type="checkbox" id="cfg-prefill" /> prefill in iframe</label>
+        <label><input type="checkbox" id="cfg-fail" /> failed submission</label>
+        <label>
+          currency
+          <select id="cfg-currency">
+            <option>USD</option>
+            <option>EUR</option>
+            <option>GBP</option>
+            <option>CAD</option>
+          </select>
+        </label>
+        <label>script <input type="text" id="cfg-script" size="26" /></label>
+        <button type="button" id="cfg-apply" class="harness-primary">Apply &amp; reload</button>
+        <button type="button" id="cfg-reset">Reset harness config</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>simulate the donor's card + submission</legend>
+        <label>
+          brand
+          <select id="sim-brand">
+            <option value="VI">VI (Visa)</option>
+            <option value="MC">MC</option>
+            <option value="AX">AX</option>
+            <option value="DS">DS</option>
+          </select>
+        </label>
+        <label>number token <input type="text" id="sim-num" size="22" value="tok_sandbox_4111111111111111" /></label>
+        <label>cvv token <input type="text" id="sim-ver" size="10" value="tok_sandbox_123" /></label>
+        <label>exp <input type="text" id="sim-exp-month" size="2" value="12" /> / <input type="text" id="sim-exp-year" size="4" value="2030" /></label>
+        <br />
+        <button type="button" id="sim-tokens" class="harness-primary">1. Write card tokens (as VGS would)</button>
+        <button type="button" id="sim-submit">2. Submit donation →</button>
+        <button type="button" id="sim-clear">Clear regive-* storage</button>
+        <p class="harness-note">
+          VGS writes its tokens into hidden inputs, so the harness sets the
+          <code>value</code> attribute and touches the form — Regive watches the
+          form with a MutationObserver, and a script setting an input's value
+          property alone produces no mutation record. Loading this page
+          standalone clears the stored tokens first, exactly as production does.
+        </p>
+      </fieldset>
+
+      <fieldset>
+        <legend>localStorage (what Regive carries between the two pages)</legend>
+        <table id="harness-storage"></table>
+      </fieldset>
+    </div>
+
+    <!-- =====================================================================
+         MOCK EN DONATION FORM
+         Regive finds this via document.querySelector("form.en__component").
+         The action is what makes the real (non-test-mode) path work: when the
+         chained iframe submits, it lands on the thank-you page, which is where
+         Regive reads its "regive-submitted" flag and celebrates.
+         ================================================================== -->
+    <form
+      class="en__component en__component--page"
+      action="test-thank-you.html"
+      method="get"
+      novalidate
+    >
+      <h2>Support our work</h2>
+
+      <div class="en__component en__component--errorblock" id="harness-errors" hidden>
+        <ul class="en__errorList">
+          <li>There was a problem processing your donation. Please try again.</li>
+        </ul>
+      </div>
+
+      <!-- Amount. The "other" markup matters: Regive's setAmount() targets
+           .en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2)
+           for the other-amount radio, with the text input in the last item. -->
+      <div class="en__component en__component--formblock">
+        <div class="en__field en__field--radio en__field--donationAmt en__field--withOther en__mandatory">
+          <label class="en__field__label">Your gift</label>
+          <div class="en__field__element en__field__element--radio">
+            <div class="en__field__item">
+              <input type="radio" id="amt-10" name="transaction.donationAmt" value="10" />
+              <label for="amt-10">$10</label>
+            </div>
+            <div class="en__field__item">
+              <input type="radio" id="amt-25" name="transaction.donationAmt" value="25" checked />
+              <label for="amt-25">$25</label>
+            </div>
+            <div class="en__field__item">
+              <input type="radio" id="amt-50" name="transaction.donationAmt" value="50" />
+              <label for="amt-50">$50</label>
+            </div>
+            <div class="en__field__item">
+              <input type="radio" id="amt-100" name="transaction.donationAmt" value="100" />
+              <label for="amt-100">$100</label>
+            </div>
+            <div class="en__field__item">
+              <input type="radio" id="amt-other" name="transaction.donationAmt" value="" />
+              <label for="amt-other">Other</label>
+            </div>
+            <div class="en__field__item en__field__item--other">
+              <input
+                type="text"
+                name="transaction.donationAmt.other"
+                class="en__field__input en__field__input--text en__field__input--other"
+                size="8"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Currency drives ENGrid.getCurrencySymbol(), which prefixes the
+           amounts on the Regive buttons. -->
+      <div class="en__component en__component--formblock">
+        <div class="en__field en__field--select en__field--paycurrency">
+          <label class="en__field__label" for="paycurrency">Currency</label>
+          <div class="en__field__element en__field__element--select">
+            <select
+              id="paycurrency"
+              name="transaction.paycurrency"
+              class="en__field__input en__field__input--select"
+            >
+              <option value="USD" data-currency-symbol="$" selected>USD</option>
+              <option value="EUR" data-currency-symbol="&euro;">EUR</option>
+              <option value="GBP" data-currency-symbol="&pound;">GBP</option>
+              <option value="CAD" data-currency-symbol="CA$">CAD</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recurring. Regive forces ONETIME + recurrpay "N" before submitting. -->
+      <div class="en__component en__component--formblock">
+        <div class="en__field en__field--radio en__field--recurrpay">
+          <label class="en__field__label">Frequency</label>
+          <div class="en__field__element en__field__element--radio">
+            <div class="en__field__item">
+              <input type="radio" id="recurr-n" name="transaction.recurrpay" value="N" checked />
+              <label for="recurr-n">One-time</label>
+            </div>
+            <div class="en__field__item">
+              <input type="radio" id="recurr-y" name="transaction.recurrpay" value="Y" />
+              <label for="recurr-y">Monthly</label>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" name="transaction.recurrfreq" value="ONETIME" />
+      </div>
+
+      <!-- Mandatory supporter fields. Regive refuses to render in the chained
+           iframe while any of these are empty (that is what EN's session
+           prefill normally fills in — the harness fakes it). -->
+      <div class="en__component en__component--formblock">
+        <div class="en__field en__field--text en__mandatory">
+          <label class="en__field__label" for="firstName">First name</label>
+          <div class="en__field__element en__field__element--text">
+            <input
+              type="text"
+              id="firstName"
+              name="supporter.firstName"
+              class="en__field__input en__field__input--text"
+            />
+          </div>
+        </div>
+        <div class="en__field en__field--text en__mandatory">
+          <label class="en__field__label" for="lastName">Last name</label>
+          <div class="en__field__element en__field__element--text">
+            <input
+              type="text"
+              id="lastName"
+              name="supporter.lastName"
+              class="en__field__input en__field__input--text"
+            />
+          </div>
+        </div>
+        <div class="en__field en__field--email en__mandatory">
+          <label class="en__field__label" for="emailAddress">Email</label>
+          <div class="en__field__element en__field__element--email">
+            <input
+              type="email"
+              id="emailAddress"
+              name="supporter.emailAddress"
+              class="en__field__input en__field__input--text"
+            />
+          </div>
+        </div>
+        <div class="en__field en__field--text en__mandatory">
+          <label class="en__field__label" for="postcode">Postcode</label>
+          <div class="en__field__element en__field__element--text">
+            <input
+              type="text"
+              id="postcode"
+              name="supporter.postcode"
+              class="en__field__input en__field__input--text"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment. transaction.ccnumber / ccvv / vgs.cardType are hidden inputs
+           on a real VGS page too: the visible inputs live inside VGS iframes and
+           only the tokens land in the form. ccexpire is deliberately a pair of
+           selects (EN's default), which exercises Regive's "12,2030" split. -->
+      <div class="en__component en__component--formblock">
+        <div class="en__field en__field--radio en__field--giveBySelect">
+          <label class="en__field__label">Payment method</label>
+          <div class="en__field__element en__field__element--radio">
+            <div class="en__field__item">
+              <input type="radio" id="giveby-card" name="transaction.giveBySelect" value="card" checked />
+              <label for="giveby-card">Credit card</label>
+            </div>
+            <div class="en__field__item">
+              <input type="radio" id="giveby-paypal" name="transaction.giveBySelect" value="paypal" />
+              <label for="giveby-paypal">PayPal</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="en__field en__field--select en__field--ccexpire">
+          <label class="en__field__label" for="ccexpire-month">Card expiry</label>
+          <div class="en__field__element en__field__element--select">
+            <select id="ccexpire-month" name="transaction.ccexpire"></select>
+            <select id="ccexpire-year" name="transaction.ccexpire"></select>
+          </div>
+          <p class="harness-hint">
+            Filled by the harness "write card tokens" button, and re-filled by
+            Regive from storage inside the chained iframe.
+          </p>
+        </div>
+
+        <input type="hidden" name="transaction.paymenttype" value="" />
+        <input type="hidden" name="transaction.ccnumber" value="" />
+        <input type="hidden" name="transaction.ccvv" value="" />
+        <input type="hidden" name="transaction.vgs.cardType" value="" />
+        <!-- supporter.appealCode is intentionally absent: Regive creates it as a
+             hidden input when it is missing, and writes the `source` there. -->
+
+        <div class="en__field en__field--checkbox en__field--feeCover">
+          <div class="en__field__element en__field__element--checkbox">
+            <div class="en__field__item">
+              <input type="checkbox" id="feeCover" name="transaction.feeCover" value="Y" />
+              <label for="feeCover">Cover the 3% processing fee</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional mock blocks (captcha / digital wallets) are injected here by
+           the harness script below, so they sit inside the EN form as they do
+           on a real page. -->
+      <div class="en__component en__component--formblock" id="harness-extras"></div>
+
+      <div class="en__component en__component--submit">
+        <div class="en__submit">
+          <button type="submit" class="en__submit__button">Donate now</button>
+        </div>
+      </div>
+    </form>
+
+    <!-- =====================================================================
+         CUSTOM THEME TEMPLATES
+         Per the README these belong on page 1, because that is the document
+         Regive renders the banner into. Reference one by id from the <regive>
+         tag's theme / theme-rules attributes on the thank-you page.
+
+         Every template here:
+           * contains {{button}} — Regive skips a template without it
+           * contains .regive-captcha-container, which a custom theme must have
+             on captcha pages, or Regive exits
+           * prints {{theme}}, so the resolved theme name is visible when
+             theme-rules pick it
+           * renders {{ask-amount}} in the copy AND from a CSS pseudo-element,
+             covering the documented "works inside <style> blocks" behaviour
+
+         Button rules are written as `.regive-embed .THEME .regive-amount-btn`
+         (three classes) on purpose: the component's own stylesheet targets
+         `body[data-regive-embedded="true"] .regive-amount-btn`, so a
+         two-class selector loses to it and a theme's padding / min-width
+         silently does nothing.
+         ================================================================== -->
+
+    <!-- Minimal reference theme: honours every colour attribute. -->
+    <template id="test-theme">
+      <style>
+        .test-theme {
+          box-sizing: border-box;
+          background: {{bg-color}};
+          color: {{txt-color}};
+          border: 2px dashed {{button-bg-color}};
+          border-radius: 10px;
+          padding: 20px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .test-theme h1 {
+          font-size: 1.25rem;
+          margin: 0 0 8px;
+        }
+        .test-theme__id {
+          font: 11px ui-monospace, Menlo, monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          opacity: 0.6;
+        }
+        .test-theme__copy {
+          margin: 0 0 12px;
+        }
+        .test-theme__stamp::after {
+          content: "from CSS: {{ask-amount}}";
+          font: 11px ui-monospace, Menlo, monospace;
+          border: 1px solid currentColor;
+          border-radius: 999px;
+          padding: 1px 8px;
+          opacity: 0.7;
+        }
+        .regive-embed .test-theme .regive-amount-btn {
+          background: {{button-bg-color}};
+          color: {{button-txt-color}};
+          border: 0;
+          border-radius: 6px;
+          padding: 12px 18px;
+          font-size: 1rem;
+          min-width: 0;
+          cursor: pointer;
+        }
+      </style>
+      <div class="test-theme">
+        <span class="test-theme__id">custom template: {{theme}}</span>
+        {{heading}}
+        <p class="test-theme__copy">
+          Ask amount is <strong data-harness-ask>{{ask-amount}}</strong>.
+          <span class="test-theme__stamp" data-harness-stamp aria-hidden="true"></span>
+        </p>
+        <div class="regive-captcha-container"></div>
+        {{button}}
+      </div>
+    </template>
+
+    <!-- ==== THEME LADDER =====================================================
+         Base tier. Selected by the theme attribute whenever the gift falls
+         below every theme-rules threshold (or when the gift is unknown, in
+         which case Regive ignores the rules entirely).
+         ==================================================================== -->
+    <template id="tier-supporter">
+      <style>
+        .tier-supporter {
+          box-sizing: border-box;
+          background: {{bg-color}};
+          color: {{txt-color}};
+          border: 1px solid #d7dee6;
+          border-left: 6px solid {{button-bg-color}};
+          border-radius: 8px;
+          padding: 18px 20px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .tier-supporter__id {
+          display: inline-block;
+          font: 11px ui-monospace, Menlo, monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: {{button-bg-color}};
+        }
+        .tier-supporter h1 {
+          font-size: 1.15rem;
+          margin: 6px 0 8px;
+        }
+        .tier-supporter__copy {
+          margin: 0 0 14px;
+          font-size: 0.95rem;
+        }
+        .tier-supporter__stamp::after {
+          content: "from CSS: {{ask-amount}}";
+          font: 11px ui-monospace, Menlo, monospace;
+          opacity: 0.55;
+          margin-left: 6px;
+        }
+        .regive-embed .tier-supporter .regive-amounts {
+          min-width: 0;
+          margin: 0;
+          justify-content: flex-start;
+        }
+        .regive-embed .tier-supporter .regive-amount-btn {
+          background: {{button-bg-color}};
+          color: {{button-txt-color}};
+          border: 0;
+          border-radius: 6px;
+          padding: 10px 16px;
+          font-size: 0.95rem;
+          min-width: 0;
+          cursor: pointer;
+        }
+      </style>
+      <div class="tier-supporter">
+        <span class="tier-supporter__id">{{theme}} &middot; base tier</span>
+        {{heading}}
+        <p class="tier-supporter__copy">
+          A <strong data-harness-ask>{{ask-amount}}</strong> add-on keeps this
+          work going.
+          <span class="tier-supporter__stamp" data-harness-stamp aria-hidden="true"></span>
+        </p>
+        <div class="regive-captcha-container"></div>
+        {{button}}
+      </div>
+    </template>
+
+    <!-- $100+ -->
+    <template id="tier-sustainer">
+      <style>
+        .tier-sustainer {
+          box-sizing: border-box;
+          background: {{bg-color}};
+          color: {{txt-color}};
+          border-radius: 12px;
+          padding: 22px 24px;
+          box-shadow: inset 0 0 0 2px #1f6feb, 0 2px 10px rgba(31, 111, 235, 0.15);
+          font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+        .tier-sustainer__id {
+          display: inline-block;
+          background: #1f6feb;
+          color: #fff;
+          font: 11px ui-monospace, Menlo, monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          border-radius: 999px;
+          padding: 3px 10px;
+        }
+        .tier-sustainer h1 {
+          font-size: 1.35rem;
+          line-height: 1.25;
+          margin: 10px 0;
+        }
+        .tier-sustainer__ask {
+          display: flex;
+          align-items: baseline;
+          gap: 10px;
+          margin: 0 0 16px;
+          padding: 10px 14px;
+          background: rgba(31, 111, 235, 0.08);
+          border-radius: 8px;
+        }
+        .tier-sustainer__ask strong {
+          font-size: 1.6rem;
+          color: #1f6feb;
+        }
+        .tier-sustainer__stamp::after {
+          content: "CSS says {{ask-amount}}";
+          font: 11px ui-monospace, Menlo, monospace;
+          color: #57606a;
+        }
+        .regive-embed .tier-sustainer .regive-amounts {
+          min-width: 0;
+          margin: 0;
+          justify-content: flex-start;
+        }
+        .regive-embed .tier-sustainer .regive-amount-btn {
+          background: {{button-bg-color}};
+          color: {{button-txt-color}};
+          border: 0;
+          border-radius: 8px;
+          padding: 12px 20px;
+          font-size: 1rem;
+          font-weight: 600;
+          min-width: 0;
+          cursor: pointer;
+        }
+      </style>
+      <div class="tier-sustainer">
+        <span class="tier-sustainer__id">{{theme}} &middot; $100+</span>
+        {{heading}}
+        <p class="tier-sustainer__ask">
+          <strong data-harness-ask>{{ask-amount}}</strong>
+          <span>suggested on top of your gift</span>
+          <span class="tier-sustainer__stamp" data-harness-stamp aria-hidden="true"></span>
+        </p>
+        <div class="regive-captcha-container"></div>
+        {{button}}
+      </div>
+    </template>
+
+    <!-- $500+. Hardcoded palette: ignores bg-color / txt-color on purpose, so
+         the harness can show a theme that overrides the colour attributes. -->
+    <template id="tier-leader">
+      <style>
+        .tier-leader {
+          box-sizing: border-box;
+          background: #16202c;
+          color: #f4ecd8;
+          border: 1px solid #c9a227;
+          border-radius: 4px;
+          padding: 26px;
+          font-family: Georgia, "Times New Roman", serif;
+        }
+        .tier-leader__id {
+          display: block;
+          font: 11px ui-monospace, Menlo, monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.18em;
+          color: #c9a227;
+          margin-bottom: 10px;
+        }
+        /* Regive's injected CSS paints .regive-heading with the txt-color
+           attribute (default #333), so a theme carrying its own palette has to
+           win that with a three-class selector — same reason as the buttons. */
+        .regive-embed .tier-leader .regive-heading {
+          color: #f4ecd8;
+          font-size: 1.5rem;
+          font-weight: normal;
+          margin: 0 0 10px;
+        }
+        .tier-leader__copy {
+          margin: 0 0 18px;
+          font-size: 1rem;
+          line-height: 1.6;
+        }
+        .tier-leader__copy strong {
+          color: #c9a227;
+          font-weight: normal;
+          border-bottom: 1px solid #c9a227;
+        }
+        .tier-leader__stamp::after {
+          content: "“{{ask-amount}}” from CSS";
+          display: block;
+          margin-top: 10px;
+          font: italic 12px Georgia, serif;
+          color: #9aa6b2;
+        }
+        .regive-embed .tier-leader .regive-amounts {
+          min-width: 0;
+          margin: 0;
+          justify-content: flex-start;
+        }
+        .regive-embed .tier-leader .regive-amount-btn {
+          background: {{button-bg-color}};
+          color: {{button-txt-color}};
+          border: 1px solid #c9a227;
+          border-radius: 2px;
+          padding: 12px 22px;
+          font-family: Georgia, serif;
+          font-size: 1rem;
+          min-width: 0;
+          cursor: pointer;
+        }
+      </style>
+      <div class="tier-leader">
+        <span class="tier-leader__id">{{theme}} &middot; $500+</span>
+        {{heading}}
+        <p class="tier-leader__copy">
+          Leadership gifts are matched dollar for dollar. Add
+          <strong data-harness-ask>{{ask-amount}}</strong> and it counts twice.
+          <span class="tier-leader__stamp" data-harness-stamp aria-hidden="true"></span>
+        </p>
+        <div class="regive-captcha-container"></div>
+        {{button}}
+      </div>
+    </template>
+
+    <!-- $1,000+. Also hardcodes its palette. -->
+    <template id="tier-champion">
+      <style>
+        .tier-champion {
+          box-sizing: border-box;
+          background: linear-gradient(135deg, #4c1d95 0%, #9d174d 100%);
+          color: #fff;
+          border-radius: 16px;
+          padding: 30px 28px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          text-align: center;
+        }
+        .tier-champion__id {
+          display: inline-block;
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          border-radius: 999px;
+          font: 11px ui-monospace, Menlo, monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          padding: 3px 12px;
+        }
+        /* Overrides the txt-color-driven .regive-heading colour, as above. */
+        .regive-embed .tier-champion .regive-heading {
+          color: #fff;
+          font-size: 1.7rem;
+          line-height: 1.2;
+          margin: 14px 0 6px;
+        }
+        .tier-champion__ask {
+          font-size: 2.6rem;
+          font-weight: 700;
+          line-height: 1;
+          margin: 10px 0 4px;
+        }
+        .tier-champion__copy {
+          margin: 0 0 18px;
+          opacity: 0.85;
+        }
+        .tier-champion__stamp::after {
+          content: "pseudo-element: {{ask-amount}}";
+          font: 11px ui-monospace, Menlo, monospace;
+          opacity: 0.7;
+        }
+        .regive-embed .tier-champion .regive-amounts {
+          min-width: 0;
+          margin: 0;
+          justify-content: center;
+        }
+        .regive-embed .tier-champion .regive-amount-btn {
+          background: #fff;
+          color: #4c1d95;
+          border: 0;
+          border-radius: 999px;
+          padding: 14px 26px;
+          font-size: 1.05rem;
+          font-weight: 700;
+          min-width: 0;
+          cursor: pointer;
+        }
+      </style>
+      <div class="tier-champion">
+        <span class="tier-champion__id">{{theme}} &middot; $1,000+</span>
+        {{heading}}
+        <div class="tier-champion__ask" data-harness-ask>{{ask-amount}}</div>
+        <p class="tier-champion__copy">
+          One more gift at this level underwrites a whole program day.
+          <span class="tier-champion__stamp" data-harness-stamp aria-hidden="true"></span>
+        </p>
+        <div class="regive-captcha-container"></div>
+        {{button}}
+      </div>
+    </template>
+
+    <!-- Optional mock blocks, cloned into the form only when enabled. -->
+    <template id="harness-tpl-captcha">
+      <div class="en__field en__field--captcha">
+        <label class="en__field__label">Verification</label>
+        <div class="en__captcha">
+          <div
+            class="g-recaptcha"
+            data-callback="harnessCaptchaVerified"
+            data-expired-callback="harnessCaptchaExpired"
+          >
+            <button type="button" data-harness-captcha="verify">I'm not a robot (mock)</button>
+            <button type="button" data-harness-captcha="expire">Expire the token</button>
+          </div>
+        </div>
+        <p class="harness-hint">
+          Mock reCAPTCHA. Regive teleports this .en__captcha into the banner,
+          wraps the global data-callback, and keeps the amount buttons disabled
+          until "I'm not a robot" fires it.
+        </p>
+      </div>
+    </template>
+
+    <template id="harness-tpl-wallets">
+      <div class="en__field en__field--digitalWallet">
+        <label class="en__field__label">Digital wallets</label>
+        <div id="en__digitalWallet">
+          <iframe title="mock wallet UI" src="about:blank" style="width: 100%; height: 0; border: 0"></iframe>
+          <button type="button" id="harness-wallet-fire">
+            Mock wallet — fire Stripe paymentRequest "paymentmethod"
+          </button>
+          <p class="harness-hint">
+            Regive waits for an iframe (or #chariot-button) inside
+            #en__digitalWallet before relocating this block into the banner. The
+            iframe above satisfies that check; note the component's own CSS hides
+            iframes in the embedded frame, so only the button stays visible here.
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      // =======================================================================
+      // HARNESS BEHAVIOUR
+      // Everything here runs synchronously while the document is still parsing,
+      // i.e. before the Regive module script at the bottom executes.
+      // =======================================================================
+      const form = document.querySelector("form.en__component");
+      const isEmbedded = window !== window.parent;
+      const isChained = new URLSearchParams(location.search).has("chain");
+
+      // ---- expiry select options -------------------------------------------
+      const monthSelect = document.getElementById("ccexpire-month");
+      const yearSelect = document.getElementById("ccexpire-year");
+      for (let month = 1; month <= 12; month++) {
+        const value = String(month).padStart(2, "0");
+        monthSelect.add(new Option(value, value));
+      }
+      const thisYear = new Date().getFullYear();
+      for (let year = thisYear; year <= thisYear + 10; year++) {
+        yearSelect.add(new Option(String(year), String(year)));
+      }
+
+      // ---- optional mock blocks --------------------------------------------
+      const extras = document.getElementById("harness-extras");
+      const injectTemplate = (id) => {
+        const template = document.getElementById(id);
+        extras.appendChild(template.content.cloneNode(true));
+        template.remove();
+      };
+      if (harnessOn(harness.captcha)) injectTemplate("harness-tpl-captcha");
+      if (harnessOn(harness.wallets)) injectTemplate("harness-tpl-wallets");
+      document
+        .querySelectorAll("#harness-tpl-captcha, #harness-tpl-wallets")
+        .forEach((leftover) => leftover.remove());
+      // Removed, not just hidden: Regive counts .en__errorList li whether or
+      // not it is visible, exactly as EN renders it only on a real failure.
+      const errorBlock = document.getElementById("harness-errors");
+      if (harnessOn(harness.fail)) errorBlock.hidden = false;
+      else errorBlock.remove();
+
+      // ---- mock reCAPTCHA callbacks ----------------------------------------
+      // Regive replaces window.harnessCaptchaVerified with its own wrapper, so
+      // the buttons must look the global up at click time, the way the real
+      // reCAPTCHA widget does.
+      window.harnessCaptchaVerified = (token) =>
+        console.log("[harness] captcha verified", token);
+      window.harnessCaptchaExpired = () => console.log("[harness] captcha expired");
+      document.querySelectorAll("[data-harness-captcha]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (button.dataset.harnessCaptcha === "verify") {
+            window.harnessCaptchaVerified("harness-mock-token");
+          } else {
+            window.harnessCaptchaExpired();
+          }
+        });
+      });
+
+      // ---- mock Stripe digital wallet --------------------------------------
+      if (harnessOn(harness.wallets)) {
+        const paymentMethodCallbacks = [];
+        window.EngagingNetworks.require._defined.enStripeButtons = {
+          stripeButtons: {
+            paymentRequest: {
+              on: (event, callback) => {
+                if (event === "paymentmethod") paymentMethodCallbacks.push(callback);
+              },
+            },
+          },
+        };
+        document
+          .getElementById("harness-wallet-fire")
+          .addEventListener("click", () => {
+            console.log("[harness] firing wallet paymentmethod", paymentMethodCallbacks.length);
+            paymentMethodCallbacks.forEach((callback) => callback({}));
+          });
+      }
+
+      // ---- currency ---------------------------------------------------------
+      document.getElementById("paycurrency").value = harness.currency;
+
+      // ---- session prefill inside the chained iframe ------------------------
+      // Real EN repopulates the supporter fields from the session on the chained
+      // page. Nothing does that here, so the harness replays whatever was
+      // submitted (or a stock donor) unless prefill is turned off.
+      const DONOR_FALLBACK = {
+        "supporter.firstName": "Test",
+        "supporter.lastName": "Donor",
+        "supporter.emailAddress": "test.donor@example.org",
+        "supporter.postcode": "20005",
+      };
+      const donorFields = Object.keys(DONOR_FALLBACK);
+      if (isChained && harnessOn(harness.prefill)) {
+        let donor = DONOR_FALLBACK;
+        try {
+          donor = Object.assign(
+            {},
+            DONOR_FALLBACK,
+            JSON.parse(localStorage.getItem("regive-test-donor") || "{}")
+          );
+        } catch (e) {
+          /* keep the fallback */
+        }
+        donorFields.forEach((name) => {
+          const field = form.querySelector(`[name="${name}"]`);
+          if (field) field.value = donor[name] || "";
+        });
+      } else if (!isChained) {
+        donorFields.forEach((name) => {
+          const field = form.querySelector(`[name="${name}"]`);
+          if (field) field.value = DONOR_FALLBACK[name];
+        });
+      }
+
+      // ---- keep Regive's MutationObserver honest ---------------------------
+      // Regive re-reads the form on any DOM mutation. Real EN pages mutate
+      // constantly (classes, validation nodes); this harness does not, so stamp
+      // the form whenever a value changes by script or by hand.
+      const touchForm = () => {
+        form.dataset.harnessTouched = String(Date.now());
+      };
+      form.addEventListener("change", touchForm);
+      form.addEventListener("input", touchForm);
+
+      // ---- simulate the card entry -----------------------------------------
+      const setHiddenValue = (name, value) => {
+        const field = form.querySelector(`[name="${name}"]`);
+        if (!field) return;
+        // setAttribute (not just .value) is what VGS does, and it is what makes
+        // the mutation observable.
+        field.setAttribute("value", value);
+        field.value = value;
+      };
+      document.getElementById("sim-tokens").addEventListener("click", () => {
+        const brand = document.getElementById("sim-brand").value;
+        setHiddenValue("transaction.ccnumber", document.getElementById("sim-num").value);
+        setHiddenValue("transaction.ccvv", document.getElementById("sim-ver").value);
+        setHiddenValue("transaction.vgs.cardType", brand);
+        setHiddenValue("transaction.paymenttype", brand);
+        monthSelect.value = document.getElementById("sim-exp-month").value;
+        yearSelect.value = document.getElementById("sim-exp-year").value;
+        const cardRadio = form.querySelector('[name="transaction.giveBySelect"][value="card"]');
+        if (cardRadio) cardRadio.checked = true;
+        touchForm();
+        renderStorage();
+      });
+
+      // ---- simulate the submission -----------------------------------------
+      // The real page posts to EN and comes back on the thank-you page. Here it
+      // is a plain navigation, carrying the harness params so the setup sticks.
+      const goToThankYouPage = () => {
+        const donor = {};
+        donorFields.forEach((name) => {
+          const field = form.querySelector(`[name="${name}"]`);
+          donor[name] = field ? field.value : "";
+        });
+        localStorage.setItem("regive-test-donor", JSON.stringify(donor));
+        const url = new URL("test-thank-you.html", location.href);
+        const current = new URLSearchParams(location.search);
+        Object.keys(HARNESS_DEFAULTS).forEach((key) => {
+          if (current.has(key)) url.searchParams.set(key, current.get(key));
+        });
+        location.href = url.toString();
+      };
+      document.getElementById("sim-submit").addEventListener("click", goToThankYouPage);
+      form.addEventListener("submit", (event) => {
+        // Only the harness's own submit is intercepted. Regive calls
+        // form.submit(), which fires no submit event and navigates for real.
+        event.preventDefault();
+        goToThankYouPage();
+      });
+
+      // ---- harness config panel --------------------------------------------
+      const configInputs = {
+        debug: document.getElementById("cfg-debug"),
+        captcha: document.getElementById("cfg-captcha"),
+        wallets: document.getElementById("cfg-wallets"),
+        prefill: document.getElementById("cfg-prefill"),
+        fail: document.getElementById("cfg-fail"),
+        currency: document.getElementById("cfg-currency"),
+        script: document.getElementById("cfg-script"),
+      };
+      Object.entries(configInputs).forEach(([key, input]) => {
+        if (input.type === "checkbox") input.checked = harnessOn(harness[key]);
+        else input.value = harness[key];
+      });
+      document.getElementById("cfg-apply").addEventListener("click", () => {
+        const url = new URL(location.href);
+        Object.entries(configInputs).forEach(([key, input]) => {
+          url.searchParams.set(
+            key,
+            input.type === "checkbox" ? (input.checked ? "1" : "0") : input.value
+          );
+        });
+        location.href = url.toString();
+      });
+      document.getElementById("cfg-reset").addEventListener("click", () => {
+        localStorage.removeItem(HARNESS_KEY);
+        location.href = location.pathname;
+      });
+
+      // ---- storage readout --------------------------------------------------
+      const REGIVE_KEYS = [
+        "regive-num",
+        "regive-ver",
+        "regive-exp",
+        "regive-card",
+        "regive-paymenttype",
+        "regive-dw-paymenttype",
+        "regive-donation-amt",
+        "regive-submitted",
+        "regive-height",
+      ];
+      const storageTable = document.getElementById("harness-storage");
+      function renderStorage() {
+        storageTable.innerHTML = REGIVE_KEYS.map((key) => {
+          const value = localStorage.getItem(key);
+          return `<tr><th>${key}</th><td class="${value ? "" : "harness-empty"}">${
+            value === null ? "—" : String(value).replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;"))
+          }</td></tr>`;
+        }).join("");
+      }
+      renderStorage();
+      setInterval(renderStorage, 750);
+      document.getElementById("sim-clear").addEventListener("click", () => {
+        REGIVE_KEYS.forEach((key) => localStorage.removeItem(key));
+        localStorage.removeItem("regive-test-donor");
+        renderStorage();
+      });
+
+      // ---- panel status -----------------------------------------------------
+      document.getElementById("harness-frame-role").textContent = isEmbedded
+        ? isChained
+          ? "chained iframe (embedded)"
+          : "iframe (no chain param)"
+        : "standalone";
+
+      // ---- load Regive ------------------------------------------------------
+      // Debug mode is read off this src, so the path has to carry ?debug. The
+      // querySelector Regive uses is script[src*='regive'], hence the filename.
+      const scriptSrc = harness.script + (harnessOn(harness.debug) ? "?debug" : "");
+      document.getElementById("harness-script-src").textContent = scriptSrc;
+      const regiveScript = document.createElement("script");
+      regiveScript.type = "module";
+      regiveScript.src = scriptSrc;
+      regiveScript.addEventListener("error", () => {
+        document.getElementById("harness-script-src").textContent =
+          scriptSrc + " — FAILED TO LOAD (run `npm run build`)";
+      });
+      document.body.appendChild(regiveScript);
+    </script>
+  </body>
+</html>
