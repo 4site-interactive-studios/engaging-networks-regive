@@ -38,7 +38,7 @@ global.d.ts               # Global type declarations (Window.EngagingNetworks, e
 
 ### Component Lifecycle
 
-1. **First page (donation form):** A MutationObserver watches for VGS token fields, the payment type, and the donation amount. When the donor submits, values are saved to localStorage (`regive-num`, `regive-ver`, `regive-exp`, `regive-card`, `regive-paymenttype`, `regive-donation-amt`). Digital wallet submissions are detected via wallet button listeners and recorded as `regive-dw-paymenttype` (a card token appearing clears the stale wallet key so the card path wins).
+1. **First page (donation form):** A MutationObserver watches for VGS token fields, the payment type, and the donation amount. When the donor submits, values are saved to localStorage (`regive-num`, `regive-ver`, `regive-exp`, `regive-card`, `regive-paymenttype`, `regive-donation-amt`, `regive-appealcode`, `regive-frequency`). Digital wallet submissions are detected via wallet button listeners and recorded as `regive-dw-paymenttype` (a card token appearing clears the stale wallet key so the card path wins).
 2. **Thank-you page (non-embedded):** The `<regive>` HTML tag is replaced with an iframe pointing back to the donation page with a `?chain` parameter.
 3. **Thank-you page (embedded/iframe):** The component reads tokens from localStorage, runs `processAmounts` to resolve the amount list, renders the banner (teleporting the CAPTCHA in if the page has one), and on click submits a second donation using the stored tokens. With digital wallets enabled, the wallet UI is moved into the banner and amount buttons *select* instead of submit. On success it triggers confetti and posts a message to the parent. Server-side submission failures (EN error list or `enjs.checkSubmissionFailed()`) cause an immediate exit.
 
@@ -82,7 +82,7 @@ If the page has a reCAPTCHA (`.g-recaptcha`), the banner must include a `.regive
 
 ### LocalStorage Keys
 
-All keys are prefixed `regive-`: `num`, `ver`, `exp`, `card` (VGS tokens), `paymenttype`, `dw-paymenttype` (wallet method), `donation-amt` (gift amount fallback), `submitted` (page ID of the regive submission), `height` (banner height). `clearStorage()` removes all of them.
+All keys are prefixed `regive-`: `num`, `ver`, `exp`, `card` (VGS tokens), `paymenttype`, `dw-paymenttype` (wallet method), `donation-amt` (gift amount fallback), `appealcode` (original gift's appeal code, for `source="original"`), `frequency` (original gift's frequency, for `hide-for-frequency`), `submitted` (page ID of the regive submission), `height` (banner height). `clearStorage()` removes all of them.
 
 ## Build & Development
 
@@ -108,8 +108,8 @@ Two layers, both dev-only (no runtime dependencies added):
 The manual Testing Checklist below still applies for real Engaging Networks client pages.
 
 Output lands in `dist/`:
-- `regive.js` — unminified ES module (~61 KB)
-- `regive.min.js` — minified production bundle (~47 KB)
+- `regive.js` — unminified ES module (~68 KB)
+- `regive.min.js` — minified production bundle (~50 KB)
 
 CSS is injected into JS at build time via `vite-plugin-css-injected-by-js` — there is no separate CSS file.
 

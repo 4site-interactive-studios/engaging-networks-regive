@@ -1740,7 +1740,7 @@ export class Regive {
         `Not setting invalid or over-limit amount (maximum ${maxRegiveAmount})`,
         "⚠️"
       );
-      return false
+      return false;
     }
     const otherField = document.querySelector(
       'input[name="transaction.donationAmt.other"]'
