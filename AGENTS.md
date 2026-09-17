@@ -38,7 +38,7 @@ global.d.ts               # Global type declarations (Window.EngagingNetworks, e
 
 ### Component Lifecycle
 
-1. **First page (donation form):** A MutationObserver watches for VGS token fields, the payment type, and the donation amount. When the donor submits, values are saved to localStorage (`regive-num`, `regive-ver`, `regive-exp`, `regive-card`, `regive-paymenttype`, `regive-donation-amt`). Digital wallet submissions are detected via wallet button listeners and recorded as `regive-dw-paymenttype` (a card token appearing clears the stale wallet key so the card path wins).
+1. **First page (donation form):** A MutationObserver watches for VGS token fields, the payment type, and the donation amount. When the donor submits, values are saved to localStorage (`regive-num`, `regive-ver`, `regive-exp`, `regive-card`, `regive-paymenttype`, `regive-donation-amt`, `regive-appealcode`, `regive-frequency`). Digital wallet submissions are detected via wallet button listeners and recorded as `regive-dw-paymenttype` (a card token appearing clears the stale wallet key so the card path wins).
 2. **Thank-you page (non-embedded):** The `<regive>` HTML tag is replaced with an iframe pointing back to the donation page with a `?chain` parameter.
 3. **Thank-you page (embedded/iframe):** The component reads tokens from localStorage, runs `processAmounts` to resolve the amount list, renders the banner (teleporting the CAPTCHA in if the page has one), and on click submits a second donation using the stored tokens. With digital wallets enabled, the wallet UI is moved into the banner and amount buttons *select* instead of submit. On success it triggers confetti and posts a message to the parent. Server-side submission failures (EN error list or `enjs.checkSubmissionFailed()`) cause an immediate exit.
 
@@ -82,7 +82,7 @@ If the page has a reCAPTCHA (`.g-recaptcha`), the banner must include a `.regive
 
 ### LocalStorage Keys
 
-All keys are prefixed `regive-`: `num`, `ver`, `exp`, `card` (VGS tokens), `paymenttype`, `dw-paymenttype` (wallet method), `donation-amt` (gift amount fallback), `submitted` (page ID of the regive submission), `height` (banner height). `clearStorage()` removes all of them.
+All keys are prefixed `regive-`: `num`, `ver`, `exp`, `card` (VGS tokens), `paymenttype`, `dw-paymenttype` (wallet method), `donation-amt` (gift amount fallback), `appealcode` (original gift's appeal code, for `source="original"`), `frequency` (original gift's frequency, for `hide-for-frequency`), `submitted` (page ID of the regive submission), `height` (banner height). `clearStorage()` removes all of them.
 
 ## Build & Development
 
@@ -91,11 +91,25 @@ npm run dev          # Vite dev server (http://localhost:5173)
 npm run build        # Type-check + Vite build
 npm run build:prod   # Full production build with Terser minification
 npm run watch        # Vite build in watch mode
+npm test             # Vitest unit tests (jsdom)
+npm run test:watch   # Vitest in watch mode
+npm run test:e2e     # Build, then run Playwright E2E tests (Chromium)
+npm run test:e2e:ui  # Playwright E2E tests in interactive UI mode
+npm run test:all     # Unit tests, then build + E2E tests (single full run)
 ```
 
+### Automated Tests
+
+Two layers, both dev-only (no runtime dependencies added):
+
+- **Unit tests** — Vitest + jsdom, configured in `tests/vitest.config.ts`. `tests/unit/engrid.test.ts` covers the ENGrid utility class (URL params, page detection, currency, field get/set, body data attributes, amounts, payment types). `tests/unit/regive.test.ts` covers the DAS logic on the Regive class — `parseAmount`, `isRegiveAmountAllowed`, `formatAskAmount`, the `processAmounts` matrix (percentages, guardrails, rounding tiers, dedupe, ceilings, test-mode preview, empty-result fallback), and `getTheme` theme rules — via bracket access to the private methods, with no `pageJson` so the constructor exits harmlessly.
+- **E2E tests** — Playwright (Chromium), configured in `tests/playwright.config.ts`. Specs live in `tests/e2e/*.spec.ts` and run against the real `dist/regive.js` build. `tests/e2e/server.mjs` is a zero-dependency static server that maps EN-style URLs (`/page/12345/donate/1`) to the fixture pages in `tests/e2e/fixtures/`, which mimic EN markup (`pageJson`, `form.en__component`, VGS hidden fields, `<regive>` tags). The specs cover token capture (including gift amount and frequency), iframe replacement, the full test-mode regive flow, postMessage sender validation, a real second-donation submission, recurring frequency handling, appeal code reuse, frequency filtering, select/radio amount input types, and dynamic ask strings (percentage resolution, ceilings, theme rules, and the `{{ask-amount}}` merge tag).
+
+The manual Testing Checklist below still applies for real Engaging Networks client pages.
+
 Output lands in `dist/`:
-- `regive.js` — unminified ES module (~61 KB)
-- `regive.min.js` — minified production bundle (~47 KB)
+- `regive.js` — unminified ES module (~68 KB)
+- `regive.min.js` — minified production bundle (~50 KB)
 
 CSS is injected into JS at build time via `vite-plugin-css-injected-by-js` — there is no separate CSS file.
 

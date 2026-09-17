@@ -75,6 +75,8 @@ The Regive component can be customized using various attributes on the `<regive>
 | `amount`       | Comma-separated list of donation amounts or percentages to display as buttons | `amount="5,8,10"`                      | `"5"`              |
 | `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag)       | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
 
+**Note:** When a chosen amount matches no preset option on the embedded donation page (e.g. a select-based amount field without that value), it is submitted through the page's "other" free-text amount field. If the page has no "other" field, regive does not submit — the component exits instead of charging a different amount than the donor chose.
+
 #### About Percentages
 
 Percentages allow you to specify donation amounts as a percentage of the user's previous gift. For example, `amount="50%"` will set the donation amount to 50% of the user's last gift (A user gifts $50, the Regive box would then ask for $25). You can mix percentage amounts with fixed amounts ie. `amount="50%,10,35"`. Fixed tokens preserve their authored order, duplicates, and formatting. Percentage tokens resolve in place and are omitted if their calculated value duplicates a fixed amount or an earlier calculated result, so fewer buttons may render.
@@ -87,7 +89,7 @@ When no usable initial gift is available, an explicit `min-amount` provides the 
 | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | -------------- |
 | `heading`           | Message displayed above the donation buttons                 | `heading="Double your impact today!"`                        | `null`         |
 | `thank-you-message` | Message shown after successful donation                      | `thank-you-message="Thank you for your additional support!"` | `"Thank You!"` |
-| `source`            | Source code for the donation (saved in supporter.appealCode) | `source="REGIVE-CHRISTMAS"`                                  | `"REGIVE"`     |
+| `source`            | Source code for the donation (saved in supporter.appealCode). Set to `original` to reuse the appeal code from the original gift | `source="REGIVE-CHRISTMAS"` or `source="original"` | `"REGIVE"`     |
 
 ### Visual Styling
 
@@ -134,6 +136,8 @@ By default, there are no theme rules applied, and the component will use the the
 | `min-amount`             | Minimum amount for a percentage gift to be                         | `min-amount="1"`                                                      | `1`                            |
 | `max-amount`             | Maximum amount for a percentage gift amount to be                  | `max-amount="100"`                                                    | `null`                         |
 | `rounding-tiers`         | Comma-separated list of rounding tiers for percentage gifts        | `rounding-tiers="0:1,50:5"`                                           | `0:1,50:5`                     |
+| `frequency` | Donation frequency: `onetime`, `monthly`, `quarterly`, or `annual`. The recurring day defaults to the current day. Recurring donations via digital wallets depend on gateway support. If the configured frequency cannot be applied on the page (e.g. no recurring option, or an unknown value), regive does not load rather than submitting with a different frequency | `frequency="monthly"` | `"onetime"` |
+| `hide-for-frequency` | Comma-separated list of original gift frequencies for which regive should not be shown. The original gift's frequency is captured on page 1 | `hide-for-frequency="annual,monthly"` | `null` |
 
 #### Base Page Option
 
