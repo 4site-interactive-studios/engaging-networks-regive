@@ -35,6 +35,9 @@ export interface RegiveOptions {
   /** Layout theme - If not part of the predefined themes, it will be used as a custom theme */
   theme?: string;
 
+  /** Layout theme rules - If certain gift amounts meet the threshold, a different theme on page will be used */
+  themeRules?: string;
+
   /** Source of the donation (saved in supporter.appealCode). Set to "original" to reuse the appeal code from the original gift */
   source?: string;
 
@@ -47,11 +50,23 @@ export interface RegiveOptions {
   /** Enable test mode without actual form submission */
   test?: boolean;
 
-  /** Specify a payment method for testing purposes (e.g., "card", "stripedigitalwallets") */
+  /** Specify a payment method for testing purposes (e.g., "card", "stripedigitalwallet") */
   testMethod?: string;
 
   /** Comma-separated list of mandatory field names to ignore when empty */
   ignoreRequiredFields?: string;
+
+  /** Amount that supporter gifted during their initial gift, formatted with the currency symbol */
+  giftAmount?: string;
+
+  /** Minimum amount that can be gifted */
+  minAmount?: string;
+
+  /** Maximum amount that can be gifted */
+  maxAmount?: string;
+
+  /** Comma-separated list of rounding tiers for percentage gifts */
+  roundingTiers?: string;
 
   /** Donation frequency for the regive donation: "onetime" (default), "monthly", "quarterly", or "annual". Recurring day defaults to the current day. */
   frequency?: string;
