@@ -35,6 +35,9 @@ const routes = [
   // First donation page with recurrpay but no recurrfreq field - must come
   // before the generic first-page route
   { pattern: /^\/page\/\d+\/nofreq\/1$/, file: "fixtures/donate-1-nofreq.html" },
+  // First donation page carrying a custom theme <template> for the theme
+  // rules tests - must come before the generic first-page route
+  { pattern: /^\/page\/\d+\/themerules\/1$/, file: "fixtures/donate-1-themes.html" },
   // Any first donation page (both /donate/1 and /test/1 variants)
   { pattern: /^\/page\/\d+\/[a-zA-Z]+\/1$/, file: "fixtures/donate-1.html" },
   // Thank-you page with the <regive> tag in normal mode
@@ -57,6 +60,18 @@ const routes = [
   { pattern: /^\/page\/\d+\/badfreq\/2$/, file: "fixtures/page-2-badfreq.html" },
   // Thank-you page with the <regive test="true"> tag
   { pattern: /^\/page\/\d+\/test\/2$/, file: "fixtures/page-2-test.html" },
+  // Thank-you pages exercising dynamic ask string processing:
+  // /percent/2 resolves percentage tokens against gift-amount="20";
+  // /nogift/2 has no usable gift, so the percentage token is skipped;
+  // /overlimit/2 includes a fixed token over the 100000 ceiling
+  { pattern: /^\/page\/\d+\/percent\/2$/, file: "fixtures/page-2-percentage.html" },
+  { pattern: /^\/page\/\d+\/nogift\/2$/, file: "fixtures/page-2-nogift.html" },
+  { pattern: /^\/page\/\d+\/overlimit\/2$/, file: "fixtures/page-2-overlimit.html" },
+  // Thank-you pages with theme rules: /themerules/2 satisfies the "big"
+  // threshold (gift 150 >= 100, embeds the template-carrying page);
+  // /themeruleslow/2 does not (gift 50) and falls back to the stacked theme
+  { pattern: /^\/page\/\d+\/themerules\/2$/, file: "fixtures/page-2-themerules.html" },
+  { pattern: /^\/page\/\d+\/themeruleslow\/2$/, file: "fixtures/page-2-themerules-low.html" },
 ];
 
 const server = createServer(async (req, res) => {

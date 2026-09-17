@@ -56,3 +56,37 @@ test("captures the original gift's frequency into localStorage", async ({
 
   await expect.poll(() => getStored(page, "regive-frequency")).toBe("monthly");
 });
+
+test("captures the selected donation amount into localStorage", async ({
+  page,
+}) => {
+  await page.goto("/page/12345/donate/1");
+
+  await page.locator('input[name="transaction.donationAmt"][value="10"]').check();
+
+  // Trigger the mutation observer via a VGS-style attribute write
+  await page.evaluate(() => {
+    document
+      .querySelector('input[name="transaction.ccnumber"]')
+      ?.setAttribute("value", "tok_cc_123");
+  });
+
+  await expect.poll(() => getStored(page, "regive-donation-amt")).toBe("10");
+});
+
+test("falls back to the other amount field when no preset is selected", async ({
+  page,
+}) => {
+  await page.goto("/page/12345/donate/1");
+
+  await page.locator('input[name="transaction.donationAmt.other"]').fill("17");
+
+  // Trigger the mutation observer via a VGS-style attribute write
+  await page.evaluate(() => {
+    document
+      .querySelector('input[name="transaction.ccnumber"]')
+      ?.setAttribute("value", "tok_cc_123");
+  });
+
+  await expect.poll(() => getStored(page, "regive-donation-amt")).toBe("17");
+});
