@@ -80,6 +80,10 @@ With `digital-wallets="true"` and a wallet payment method detected, the componen
 
 If the page has a reCAPTCHA (`.g-recaptcha`), the banner must include a `.regive-captcha-container` (custom themes need to add one — otherwise Regive exits). The `.en__captcha` element is teleported into the banner, `data-callback` is wrapped to unlock the amount buttons on success, and `data-expired-callback` re-locks them. A 5-second soft timeout treats a never-appearing captcha as optional and unlocks the buttons.
 
+### Fail-Closed Contract
+
+The component must never submit a different donation than the donor chose. `setAmount` and `setFrequency` return `boolean`: they write the value, verify it by re-reading the field (fields can be radio, select, checkbox, hidden, or text), and return `false` when the write cannot be applied on the page. Every caller must check the return value and `exit()` on `false` — never fall back to a different amount or frequency. The same rule applies to the `isRegiveAmountAllowed` ceiling guards and to the "other" amount fallback, which is only allowed when the page's "Other" radio option exists and can be checked (EN ignores `donationAmt.other` otherwise). `submitForm` re-verifies both amount and frequency immediately before submitting, because page scripts can flip fields after load. When in doubt, exit: a missing banner is recoverable, a wrong charge is not.
+
 ### LocalStorage Keys
 
 All keys are prefixed `regive-`: `num`, `ver`, `exp`, `card` (VGS tokens), `paymenttype`, `dw-paymenttype` (wallet method), `donation-amt` (gift amount fallback), `appealcode` (original gift's appeal code, for `source="original"`), `frequency` (original gift's frequency, for `hide-for-frequency`), `submitted` (page ID of the regive submission), `height` (banner height). `clearStorage()` removes all of them.
@@ -125,7 +129,7 @@ They are development fixtures, not an automated test suite. There are no asserti
 - `window.EngagingNetworks`: an `enjs.checkSubmissionFailed()` stub wired to the `fail` flag, a `feeCover` config, and a Stripe `paymentRequest` stub when wallets are on.
 - The EN form: `form.en__component` carrying the field names ENGrid reads, `.en__mandatory` wrappers, `.en__submit` (so `createHiddenInput` has an anchor), the `.en__field--withOther` amount markup `setAmount()` targets, and `transaction.ccexpire` as a select pair, which exercises the `"12,2030"` split.
 - Optional blocks behind harness flags: a `.g-recaptcha` inside `.en__captcha` whose buttons look up the global callback by name at click time, so Regive's wrapper actually runs, plus an `#en__digitalWallet` block.
-- `supporter.appealCode` is deliberately absent from the form, which keeps the `createHiddenInput` path under test.
+- `supporter.appealCode` is present but empty so `source="original"` can be exercised; deleting the input puts the `createHiddenInput` path under test instead. `transaction.recurrfreq` is a select so monthly/quarterly/annual captures (and `hide-for-frequency`) can be exercised.
 
 ### Keep in sync
 

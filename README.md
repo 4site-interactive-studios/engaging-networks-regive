@@ -137,7 +137,7 @@ By default, there are no theme rules applied, and the component will use the the
 | `max-amount`             | Maximum amount for a percentage gift amount to be                  | `max-amount="100"`                                                    | `null`                         |
 | `rounding-tiers`         | Comma-separated list of rounding tiers for percentage gifts        | `rounding-tiers="0:1,50:5"`                                           | `0:1,50:5`                     |
 | `frequency` | Donation frequency: `onetime`, `monthly`, `quarterly`, or `annual`. The recurring day defaults to the current day. Recurring donations via digital wallets depend on gateway support. If the configured frequency cannot be applied on the page (e.g. no recurring option, or an unknown value), regive does not load rather than submitting with a different frequency | `frequency="monthly"` | `"onetime"` |
-| `hide-for-frequency` | Comma-separated list of original gift frequencies for which regive should not be shown. The original gift's frequency is captured on page 1 | `hide-for-frequency="annual,monthly"` | `null` |
+| `hide-for-frequency` | Comma-separated list of original gift frequencies for which regive should not be shown. Valid values: `onetime`, `monthly`, `quarterly`, `annual`. The original gift's frequency is captured on page 1 | `hide-for-frequency="annual,monthly"` | `null` |
 
 **Note:** With the default `onetime` frequency, a page that only offers recurring giving (`transaction.recurrpay` can only be `Y`) counts as "frequency cannot be applied" — regive will not load there. Set `frequency` to a recurring value for such pages.
 
@@ -546,3 +546,9 @@ The mock wallet block is thinner than the rest. Moving the wallet UI into the ba
    npm run build:prod
    ```
 7. The minified file will be available at `dist/regive.min.js`
+8. Run the automated tests (Vitest unit tests, then build + Playwright E2E)
+   ```bash
+   npm test
+   npm run test:e2e
+   ```
+   `npm run test:all` runs both suites in a single command.

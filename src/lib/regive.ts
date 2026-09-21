@@ -850,12 +850,11 @@ export class Regive {
       giveBySelect.checked = true;
     }
     if (cardMethods.includes(paymentMethod)) {
-      this.writeHiddenCardFields(paymentMethod);
+      this.writeHiddenCardFields(paymentMethod, source);
     }
   }
 
-  private writeHiddenCardFields(paymentMethod: string) {
-    const source = this.resolveAppealCode();
+  private writeHiddenCardFields(paymentMethod: string, source: string) {
     const tokens = this.getVgsTokens();
     const expField = this.ENgrid.getField(
       "transaction.ccexpire"
@@ -1074,6 +1073,9 @@ export class Regive {
             `Not loading Regive: original gift frequency "${effectiveFrequency}" matches hide-for-frequency "${hideForFrequency}"`,
             "⚠️"
           );
+          // The regive will never happen, so the captured tokens are dead
+          // weight - clear them now rather than on the next page 1 visit
+          this.clearStorage();
           return;
         }
       }
@@ -1894,6 +1896,16 @@ export class Regive {
         this.exit();
         return;
       }
+      // The frequency was applied and verified at load, but page scripts can
+      // flip recurring fields afterwards - re-verify before submitting
+      if (!this.setFrequency()) {
+        this.log(
+          "Not submitting form because the configured frequency is no longer applied",
+          "🔴"
+        );
+        this.exit();
+        return;
+      }
       localStorage.setItem(
         "regive-submitted",
         this.ENgrid.getPageID().toString()
@@ -2110,7 +2122,12 @@ export class Regive {
     } else {
       return false;
     }
-    return this.ENgrid.getFieldValue(name) === value;
+    // getFieldValue comma-joins same-named fields (e.g. a hidden mirror plus
+    // a radio group). The write counts as applied only when every submitted
+    // value for the name matches - one stale entry means it did not stick.
+    return this.ENgrid.getFieldValue(name)
+      .split(",")
+      .every((fieldValue) => fieldValue === value);
   }
 
   // Set the configured donation frequency on the form. The recurrpay and
