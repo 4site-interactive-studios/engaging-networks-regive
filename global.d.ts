@@ -21,6 +21,7 @@ declare global {
       campaignPageId?: number;
       clientId?: number;
       pageType?: string;
+      recurring?: boolean;
     };
     confetti: (options: {
       startVelocity?: number;

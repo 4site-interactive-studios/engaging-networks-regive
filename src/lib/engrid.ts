@@ -94,6 +94,14 @@ export abstract class ENGrid {
     dispatchEvents: boolean = false
   ) {
     if (value === ENGrid.getFieldValue(name)) return;
+    // Match option/radio values numerically as well as literally, so e.g.
+    // "10" also matches an option valued "10.00"
+    const numericValue = parseFloat(String(value));
+    const matches = (optionValue: string) =>
+      optionValue == value ||
+      (!isNaN(numericValue) &&
+        optionValue.trim() !== "" &&
+        parseFloat(optionValue) === numericValue);
     (document.getElementsByName(name) as NodeListOf<HTMLFormElement>).forEach(
       (field) => {
         if ("type" in field) {
@@ -101,7 +109,7 @@ export abstract class ENGrid {
             case "select-one":
             case "select-multiple":
               for (const option of field.options) {
-                if (option.value == value) {
+                if (matches(option.value)) {
                   option.selected = true;
                   if (dispatchEvents) {
                     field.dispatchEvent(new Event("change", { bubbles: true }));
@@ -111,7 +119,7 @@ export abstract class ENGrid {
               break;
             case "checkbox":
             case "radio":
-              if (field.value == value) {
+              if (matches(field.value)) {
                 field.checked = true;
                 if (dispatchEvents) {
                   field.dispatchEvent(new Event("change", { bubbles: true }));

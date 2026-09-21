@@ -478,7 +478,11 @@
         </div>
       </div>
 
-      <!-- Recurring. Regive forces ONETIME + recurrpay "N" before submitting. -->
+      <!-- Recurring. Regive writes the configured frequency (default one-time)
+           before submitting, and captures the original gift's frequency from
+           these fields for hide-for-frequency. The recurrfreq select is what
+           makes monthly/quarterly/annual captures possible - a hidden
+           recurrfreq would read as ENgrid's two-option (monthly) layout. -->
       <div class="en__component en__component--formblock">
         <div class="en__field en__field--radio en__field--recurrpay">
           <label class="en__field__label">Frequency</label>
@@ -489,11 +493,16 @@
             </div>
             <div class="en__field__item">
               <input type="radio" id="recurr-y" name="transaction.recurrpay" value="Y" />
-              <label for="recurr-y">Monthly</label>
+              <label for="recurr-y">Recurring</label>
             </div>
           </div>
         </div>
-        <input type="hidden" name="transaction.recurrfreq" value="ONETIME" />
+        <select name="transaction.recurrfreq">
+          <option value="ONETIME" selected>One-time</option>
+          <option value="MONTHLY">Monthly</option>
+          <option value="QUARTERLY">Quarterly</option>
+          <option value="ANNUAL">Annual</option>
+        </select>
       </div>
 
       <!-- Mandatory supporter fields. Regive refuses to render in the chained
@@ -581,8 +590,12 @@
         <input type="hidden" name="transaction.ccnumber" value="" />
         <input type="hidden" name="transaction.ccvv" value="" />
         <input type="hidden" name="transaction.vgs.cardType" value="" />
-        <!-- supporter.appealCode is intentionally absent: Regive creates it as a
-             hidden input when it is missing, and writes the `source` there. -->
+        <!-- supporter.appealCode is present (empty) so source="original" can be
+             exercised from the harness - set a value here to simulate an
+             original gift with an appeal code. Delete the input entirely to
+             exercise the createHiddenInput path instead: Regive creates the
+             hidden input when it is missing and writes the `source` there. -->
+        <input type="hidden" name="supporter.appealCode" value="" />
 
         <div class="en__field en__field--checkbox en__field--feeCover">
           <div class="en__field__element en__field__element--checkbox">
@@ -1225,6 +1238,8 @@
         "regive-paymenttype",
         "regive-dw-paymenttype",
         "regive-donation-amt",
+        "regive-appealcode",
+        "regive-frequency",
         "regive-submitted",
         "regive-height",
       ];
