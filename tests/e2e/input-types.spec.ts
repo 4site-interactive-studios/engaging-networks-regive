@@ -106,6 +106,23 @@ test("submits through the other amount field when the page has an Other radio op
   await expect(echo).toContainText("transaction.donationAmt.other=7.00");
 });
 
+test("exits when the other-amount fallback selector matches a non-radio input", async ({
+  page,
+}) => {
+  await page.goto("/page/12345/withotherbroken/2");
+
+  const frame = page.frameLocator("iframe.regive-iframe");
+  const button = frame.locator('.regive-amount-btn[data-amount="7"]');
+  await expect(button).toBeAttached();
+  await button.click();
+
+  // The markup variant puts a disabled text input where the "Other" radio
+  // should be. Checking it is a no-op, so submitting would charge the stale
+  // $5 selection alongside the "other" $7 - the child exits instead.
+  await expect(page.locator(".regive-container")).toHaveCount(0);
+  await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
+});
+
 test("exits when no option matches and there is no other amount field", async ({
   page,
 }) => {

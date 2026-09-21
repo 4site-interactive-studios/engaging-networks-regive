@@ -41,6 +41,9 @@ const routes = [
   // First donation page with EN's radio amount field including an "Other"
   // option - must come before the generic first-page route
   { pattern: /^\/page\/\d+\/withother\/1$/, file: "fixtures/donate-1-withother.html" },
+  // Variant where the "Other" markup is broken: the fallback selector
+  // matches a non-radio input - must come before the generic first-page route
+  { pattern: /^\/page\/\d+\/withotherbroken\/1$/, file: "fixtures/donate-1-withother-broken.html" },
   // Any first donation page (both /donate/1 and /test/1 variants)
   { pattern: /^\/page\/\d+\/[a-zA-Z]+\/1$/, file: "fixtures/donate-1.html" },
   // Thank-you page with the <regive> tag in normal mode
@@ -59,8 +62,9 @@ const routes = [
   // /selectsbad/2 embeds the selects page (whose "other" text field has no
   // matching "Other" radio, so the amount cannot be applied safely);
   // /selectsnoother/2 embeds the selects page without an "other" field;
-  // /withother/2 embeds the radio page with a real "Other" option
-  { pattern: /^\/page\/\d+\/(?:selectsbad|selectsnoother|withother)\/2$/, file: "fixtures/page-2-amount7.html" },
+  // /withother/2 embeds the radio page with a real "Other" option;
+  // /withotherbroken/2 embeds the broken-markup variant
+  { pattern: /^\/page\/\d+\/(?:selectsbad|selectsnoother|withother|withotherbroken)\/2$/, file: "fixtures/page-2-amount7.html" },
   // Thank-you page where pageJson reports the original gift as recurring
   // (ENgrid's two-option layout captures it as "onetime" on page 1)
   { pattern: /^\/page\/\d+\/recurringgift\/2$/, file: "fixtures/page-2-recurringgift.html" },

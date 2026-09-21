@@ -1074,7 +1074,9 @@ export class Regive {
             "⚠️"
           );
           // The regive will never happen, so the captured tokens are dead
-          // weight - clear them now rather than on the next page 1 visit
+          // weight - clear them now rather than on the next page 1 visit.
+          // This assumes one <regive> tag per page: with several, a skipped
+          // tag would wipe tokens before a later tag's iframe reads them.
           this.clearStorage();
           return;
         }
@@ -1829,7 +1831,31 @@ export class Regive {
         );
         return false;
       }
+      // The selector can match a hidden or text input on theme variants that
+      // reorder the markup - checking such an input is a silent no-op that
+      // leaves the stale preset selected alongside the "other" amount
+      if (enFieldOtherAmountRadio.type !== "radio") {
+        this.log(
+          `Could not set the donation amount to ${target} - the "Other" option is not a radio button`,
+          "🔴"
+        );
+        return false;
+      }
       enFieldOtherAmountRadio.checked = true;
+      // Verify the check actually took. :checked only applies to checkable
+      // inputs, and the Other radio's value is empty, so a FormData read
+      // cannot distinguish "Other checked" from "nothing checked"
+      if (
+        document.querySelector(
+          'input[name="transaction.donationAmt"]:checked'
+        ) !== enFieldOtherAmountRadio
+      ) {
+        this.log(
+          `Could not set the donation amount to ${target} - the "Other" radio could not be checked`,
+          "🔴"
+        );
+        return false;
+      }
       otherField.value = target.toFixed(2);
       if (
         parseFloat(
