@@ -39,7 +39,7 @@ global.d.ts               # Global type declarations (Window.EngagingNetworks, e
 ### Component Lifecycle
 
 1. **First page (donation form):** A MutationObserver watches for VGS token fields, the payment type, and the donation amount. When the donor submits, values are saved to localStorage (`regive-num`, `regive-ver`, `regive-exp`, `regive-card`, `regive-paymenttype`, `regive-donation-amt`, `regive-appealcode`, `regive-frequency`). Digital wallet submissions are detected via wallet button listeners and recorded as `regive-dw-paymenttype` (a card token appearing clears the stale wallet key so the card path wins).
-2. **Thank-you page (non-embedded):** The `<regive>` HTML tag is replaced with an iframe pointing back to the donation page with a `?chain` parameter.
+2. **Thank-you page (non-embedded):** The `<regive>` HTML tag is replaced with an iframe pointing back to the donation page with a `?chain` parameter — unless the original gift's frequency (from `regive-frequency`, cross-checked against `pageJson.recurring`, which can only upgrade an `onetime` capture to `monthly`) matches the tag's `hide-for-frequency` list. A skipped tag is left in place and `clearStorage()` runs, which assumes one `<regive>` tag per page: the clear would starve a sibling tag's iframe of its tokens.
 3. **Thank-you page (embedded/iframe):** The component reads tokens from localStorage, runs `processAmounts` to resolve the amount list, renders the banner (teleporting the CAPTCHA in if the page has one), and on click submits a second donation using the stored tokens. With digital wallets enabled, the wallet UI is moved into the banner and amount buttons *select* instead of submit. On success it triggers confetti and posts a message to the parent. Server-side submission failures (EN error list or `enjs.checkSubmissionFailed()`) cause an immediate exit.
 
 ### Parent-Child Communication
@@ -107,7 +107,9 @@ npm run test:all     # Unit tests, then build + E2E tests (single full run)
 Two layers, both dev-only (no runtime dependencies added):
 
 - **Unit tests** — Vitest + jsdom, configured in `tests/vitest.config.ts`. `tests/unit/engrid.test.ts` covers the ENGrid utility class (URL params, page detection, currency, field get/set, body data attributes, amounts, payment types). `tests/unit/regive.test.ts` covers the DAS logic on the Regive class — `parseAmount`, `isRegiveAmountAllowed`, `formatAskAmount`, the `processAmounts` matrix (percentages, guardrails, rounding tiers, dedupe, ceilings, test-mode preview, empty-result fallback), and `getTheme` theme rules — via bracket access to the private methods, with no `pageJson` so the constructor exits harmlessly.
-- **E2E tests** — Playwright (Chromium), configured in `tests/playwright.config.ts`. Specs live in `tests/e2e/*.spec.ts` and run against the real `dist/regive.js` build. `tests/e2e/server.mjs` is a zero-dependency static server that maps EN-style URLs (`/page/12345/donate/1`) to the fixture pages in `tests/e2e/fixtures/`, which mimic EN markup (`pageJson`, `form.en__component`, VGS hidden fields, `<regive>` tags). The specs cover token capture (including gift amount and frequency), iframe replacement, the full test-mode regive flow, postMessage sender validation, a real second-donation submission, recurring frequency handling, appeal code reuse, frequency filtering, select/radio amount input types, and dynamic ask strings (percentage resolution, ceilings, theme rules, and the `{{ask-amount}}` merge tag).
+- **E2E tests** — Playwright (Chromium), configured in `tests/playwright.config.ts`. Specs live in `tests/e2e/*.spec.ts` and run against the real `dist/regive.js` build. `tests/e2e/server.mjs` is a zero-dependency static server that maps EN-style URLs (`/page/12345/donate/1`) to the fixture pages in `tests/e2e/fixtures/`, which mimic EN markup (`pageJson`, `form.en__component`, VGS hidden fields, `<regive>` tags). The specs cover token capture (including gift amount and frequency), iframe replacement, the full test-mode regive flow, postMessage sender validation, a real second-donation submission, recurring frequency handling, appeal code reuse, frequency filtering, select/radio amount input types (including the "Other" amount fallback and its failure modes), and dynamic ask strings (percentage resolution, ceilings, theme rules, and the `{{ask-amount}}` merge tag).
+
+Both suites run in CI (`.github/workflows/test.yml`) on pushes to `main` and on every pull request, with the Playwright report uploaded as an artifact on failure.
 
 The manual Testing Checklist below still applies for real Engaging Networks client pages.
 
@@ -205,7 +207,7 @@ Use the `log()` method inside the Regive class. Debug output is gated behind `?d
 
 - Append `?debug` to the script URL to enable verbose console logging.
 - Use `test="true"` on the `<regive>` tag to simulate donations without real submissions; add `test-method="card"` (or `applepay`, `googlepay`, `stripedigitalwallet`, `paypaltouch`, `daf`) to simulate a specific payment method.
-- Reach for the local fixtures (`test-page-1.html`, `test-thank-you.html`) for anything touching the two-page flow, the chained iframe, token capture, or theme rules. See Local Test Fixtures.
+- Reach for the local fixtures (`test-page-1.html`, `test-thank-you.html`) for anything touching the two-page flow, the chained iframe, token capture, frequency handling, or theme rules. See Local Test Fixtures.
 - Check browser console — log entries are emoji-coded for quick scanning.
 
 ## Security Rules
@@ -226,6 +228,7 @@ Before submitting any change:
 - Test with test mode on and off.
 - Test with various configuration combinations (amounts, themes, colors).
 - Test percentage amounts with min/max guardrails, rounding tiers, and theme rules — including missing/unresolved gift amounts.
+- Test `frequency` (each value, plus an unknown value and pages with no recurring option) and `hide-for-frequency` against one-time and recurring original gifts, plus `source="original"` with and without a captured appeal code.
 - Test with CAPTCHA-enabled pages (buttons lock/unlock correctly) and digital wallet flows.
 - Test on actual Engaging Networks client pages.
 - Test on Engaging Networks pages that use ENGrid.
