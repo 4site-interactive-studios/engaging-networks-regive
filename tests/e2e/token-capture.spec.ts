@@ -90,3 +90,22 @@ test("falls back to the other amount field when no preset is selected", async ({
 
   await expect.poll(() => getStored(page, "regive-donation-amt")).toBe("17");
 });
+
+test("captures monthly when recurrpay is Y and the page has no recurrfreq field", async ({
+  page,
+}) => {
+  // ENgrid's two-option layout (onetime/monthly only) hides the recurrfreq
+  // field, so recurrpay=Y on its own means the gift is monthly
+  await page.goto("/page/12345/nofreq/1");
+
+  await page.locator('input[name="transaction.recurrpay"][value="Y"]').check();
+
+  // Trigger the mutation observer via a VGS-style attribute write
+  await page.evaluate(() => {
+    document
+      .querySelector('input[name="transaction.ccnumber"]')
+      ?.setAttribute("value", "tok_cc_123");
+  });
+
+  await expect.poll(() => getStored(page, "regive-frequency")).toBe("monthly");
+});

@@ -54,3 +54,31 @@ test("loads regive when no original frequency was captured", async ({
 
   await expect(page.locator("iframe.regive-iframe")).toBeAttached();
 });
+
+test("treats an onetime-captured gift as monthly when pageJson says recurring", async ({
+  page,
+  context,
+}) => {
+  // ENgrid's two-option layout hides the recurrfreq field on page 1, so a
+  // monthly gift is captured as "onetime". The thank-you page's
+  // pageJson.recurring corrects the reading and the tag stays hidden.
+  await seedFrequency(context, "onetime");
+  await page.goto("/page/12345/recurringgift/2");
+
+  await page.waitForTimeout(500);
+  await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
+  await expect(page.locator(".regive-container")).toHaveCount(0);
+  await expect(page.locator("regive")).toBeAttached();
+});
+
+test("does not downgrade a captured quarterly gift when pageJson says recurring", async ({
+  page,
+  context,
+}) => {
+  // pageJson.recurring is only a boolean, so it can upgrade an
+  // "onetime" reading to monthly but must never override a real capture
+  await seedFrequency(context, "quarterly");
+  await page.goto("/page/12345/recurringgift/2");
+
+  await expect(page.locator("iframe.regive-iframe")).toBeAttached();
+});

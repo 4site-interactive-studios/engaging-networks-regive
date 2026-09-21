@@ -38,6 +38,9 @@ const routes = [
   // First donation page carrying a custom theme <template> for the theme
   // rules tests - must come before the generic first-page route
   { pattern: /^\/page\/\d+\/themerules\/1$/, file: "fixtures/donate-1-themes.html" },
+  // First donation page with EN's radio amount field including an "Other"
+  // option - must come before the generic first-page route
+  { pattern: /^\/page\/\d+\/withother\/1$/, file: "fixtures/donate-1-withother.html" },
   // Any first donation page (both /donate/1 and /test/1 variants)
   { pattern: /^\/page\/\d+\/[a-zA-Z]+\/1$/, file: "fixtures/donate-1.html" },
   // Thank-you page with the <regive> tag in normal mode
@@ -53,9 +56,14 @@ const routes = [
   // the select-based pages
   { pattern: /^\/page\/\d+\/(?:monthly(?:ok)?|nofields|nofreq|selects|selectsnomonthly)\/2$/, file: "fixtures/page-2-monthly.html" },
   // Thank-you pages with an amount that has no matching select option.
-  // /selectsbad/2 embeds the selects page (which has an "other" field);
-  // /selectsnoother/2 embeds the selects page without one
-  { pattern: /^\/page\/\d+\/(?:selectsbad|selectsnoother)\/2$/, file: "fixtures/page-2-amount7.html" },
+  // /selectsbad/2 embeds the selects page (whose "other" text field has no
+  // matching "Other" radio, so the amount cannot be applied safely);
+  // /selectsnoother/2 embeds the selects page without an "other" field;
+  // /withother/2 embeds the radio page with a real "Other" option
+  { pattern: /^\/page\/\d+\/(?:selectsbad|selectsnoother|withother)\/2$/, file: "fixtures/page-2-amount7.html" },
+  // Thank-you page where pageJson reports the original gift as recurring
+  // (ENgrid's two-option layout captures it as "onetime" on page 1)
+  { pattern: /^\/page\/\d+\/recurringgift\/2$/, file: "fixtures/page-2-recurringgift.html" },
   // Thank-you page with an unknown frequency on the <regive> tag
   { pattern: /^\/page\/\d+\/badfreq\/2$/, file: "fixtures/page-2-badfreq.html" },
   // Thank-you page with the <regive test="true"> tag

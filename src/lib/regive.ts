@@ -1056,9 +1056,22 @@ export class Regive {
           .map((frequency) => frequency.trim().toLowerCase())
           .filter((frequency) => frequency !== "");
         const originalFrequency = localStorage.getItem("regive-frequency");
-        if (originalFrequency && hiddenFrequencies.includes(originalFrequency)) {
+        // Cross-check with the thank-you page's own gift data: ENgrid's
+        // two-option layout hides the recurrfreq field on page 1, so a
+        // recurring gift may have been captured as "onetime". pageJson only
+        // says recurring or not, so monthly is the safe upgrade - it can
+        // never downgrade a captured quarterly/annual gift.
+        const effectiveFrequency =
+          originalFrequency === "onetime" &&
+          window.pageJson?.recurring === true
+            ? "monthly"
+            : originalFrequency;
+        if (
+          effectiveFrequency &&
+          hiddenFrequencies.includes(effectiveFrequency)
+        ) {
           this.log(
-            `Not loading Regive: original gift frequency "${originalFrequency}" matches hide-for-frequency "${hideForFrequency}"`,
+            `Not loading Regive: original gift frequency "${effectiveFrequency}" matches hide-for-frequency "${hideForFrequency}"`,
             "⚠️"
           );
           return;
@@ -1195,6 +1208,10 @@ export class Regive {
 
     // Derive the original gift's frequency from the recurrpay/recurrfreq
     // fields and store it. A gift is recurring only when recurrpay is "Y".
+    // When recurrpay is "Y" but recurrfreq is missing or blank, the page is
+    // using ENgrid's two-option layout (onetime/monthly only), where the
+    // recurrfreq field is hidden and written by ENgrid itself - so the gift
+    // is monthly.
     const saveFrequencyToStorage = () => {
       const recurrpay = this.ENgrid.getFieldValue("transaction.recurrpay")
         .trim()
@@ -1204,9 +1221,9 @@ export class Regive {
         const recurrfreq = this.ENgrid.getFieldValue("transaction.recurrfreq")
           .trim()
           .toUpperCase();
-        if (["MONTHLY", "QUARTERLY", "ANNUAL"].includes(recurrfreq)) {
-          frequency = recurrfreq.toLowerCase();
-        }
+        frequency = ["MONTHLY", "QUARTERLY", "ANNUAL"].includes(recurrfreq)
+          ? recurrfreq.toLowerCase()
+          : "monthly";
       }
       if (frequency !== localStorage.getItem("regive-frequency")) {
         this.log("Saving original gift frequency to localStorage", "💾", {
@@ -1787,8 +1804,10 @@ export class Regive {
       target
     ) {
       // No preset option matched - fall back to the "other" free-text
-      // amount, whatever the main field's input type. EN gives the "other"
-      // amount precedence over a stale select selection or radio choice.
+      // amount. EN only gives the "other" amount precedence when its
+      // "Other" radio option is checked; writing the "other" field while a
+      // stale select selection or radio choice remains would charge the
+      // wrong amount, so that radio is required.
       if (!otherField) {
         this.log(
           `Could not set the donation amount to ${target} - the field reads "${this.ENgrid.getFieldValue(
@@ -1801,9 +1820,14 @@ export class Regive {
       const enFieldOtherAmountRadio = document.querySelector(
         `.en__field--donationAmt.en__field--withOther .en__field__item:nth-last-child(2) input[name="transaction.donationAmt"]`
       ) as HTMLInputElement;
-      if (enFieldOtherAmountRadio) {
-        enFieldOtherAmountRadio.checked = true;
+      if (!enFieldOtherAmountRadio) {
+        this.log(
+          `Could not set the donation amount to ${target} - no preset option matches and the page has no "Other" radio option`,
+          "🔴"
+        );
+        return false;
       }
+      enFieldOtherAmountRadio.checked = true;
       otherField.value = target.toFixed(2);
       if (
         parseFloat(

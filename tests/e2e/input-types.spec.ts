@@ -70,7 +70,7 @@ test("exits when the recurrfreq select has no option for the configured frequenc
   await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
 });
 
-test("falls back to the other amount field when no select option matches", async ({
+test("exits when no select option matches and the page has no Other radio option", async ({
   page,
 }) => {
   await page.goto("/page/12345/selectsbad/2");
@@ -80,8 +80,27 @@ test("falls back to the other amount field when no select option matches", async
   await expect(button).toBeAttached();
   await button.click();
 
-  // $7 matches no option in the embedded page's donationAmt select (5.00 /
-  // 10.00), so it is submitted through the "other" free-text field
+  // $7 matches no option in the embedded page's donationAmt select. The page
+  // has an "other" text field but no "Other" radio option, and EN only gives
+  // the "other" amount precedence when that radio is checked - so writing it
+  // would charge the stale select value. The child exits instead.
+  await expect(page.locator(".regive-container")).toHaveCount(0);
+  await expect(page.locator("iframe.regive-iframe")).toHaveCount(0);
+});
+
+test("submits through the other amount field when the page has an Other radio option", async ({
+  page,
+}) => {
+  await page.goto("/page/12345/withother/2");
+
+  const frame = page.frameLocator("iframe.regive-iframe");
+  const button = frame.locator('.regive-amount-btn[data-amount="7"]');
+  await expect(button).toBeAttached();
+  await button.click();
+
+  // $7 matches no preset radio, so the "Other" radio is checked and the
+  // amount is submitted through the free-text field - the only layout where
+  // EN honors the "other" amount
   const echo = frame.locator("#echo");
   await expect(echo).toBeAttached();
   await expect(echo).toContainText("transaction.donationAmt.other=7.00");

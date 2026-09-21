@@ -75,7 +75,7 @@ The Regive component can be customized using various attributes on the `<regive>
 | `amount`       | Comma-separated list of donation amounts or percentages to display as buttons | `amount="5,8,10"`                      | `"5"`              |
 | `button-label` | Label for the donation buttons (can include the `{{amount}}` merge tag)       | `button-label="Donate {{amount}} Now"` | `"Add {{amount}}"` |
 
-**Note:** When a chosen amount matches no preset option on the embedded donation page (e.g. a select-based amount field without that value), it is submitted through the page's "other" free-text amount field. If the page has no "other" field, regive does not submit — the component exits instead of charging a different amount than the donor chose.
+**Note:** When a chosen amount matches no preset option on the embedded donation page, it is submitted through the page's "Other" free-text amount option — the component checks the page's "Other" radio and writes the amount to the free-text field, the only layout where EN honors the "other" amount. If the page has no "Other" option (e.g. a select-based amount field without that value), regive does not submit — the component exits instead of charging a different amount than the donor chose.
 
 #### About Percentages
 
@@ -138,6 +138,8 @@ By default, there are no theme rules applied, and the component will use the the
 | `rounding-tiers`         | Comma-separated list of rounding tiers for percentage gifts        | `rounding-tiers="0:1,50:5"`                                           | `0:1,50:5`                     |
 | `frequency` | Donation frequency: `onetime`, `monthly`, `quarterly`, or `annual`. The recurring day defaults to the current day. Recurring donations via digital wallets depend on gateway support. If the configured frequency cannot be applied on the page (e.g. no recurring option, or an unknown value), regive does not load rather than submitting with a different frequency | `frequency="monthly"` | `"onetime"` |
 | `hide-for-frequency` | Comma-separated list of original gift frequencies for which regive should not be shown. The original gift's frequency is captured on page 1 | `hide-for-frequency="annual,monthly"` | `null` |
+
+**Note:** With the default `onetime` frequency, a page that only offers recurring giving (`transaction.recurrpay` can only be `Y`) counts as "frequency cannot be applied" — regive will not load there. Set `frequency` to a recurring value for such pages.
 
 #### Base Page Option
 
