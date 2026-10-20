@@ -129,6 +129,8 @@ By default, there are no theme rules applied, and the component will use the the
 | `confetti`               | Enable/disable confetti or set custom colors                       | `confetti="#FF0000,#00FF00,#0000FF"`                                  | `"default"`                    |
 | `test`                   | Enable test mode without actual form submission                    | `test="true"`                                                         | `false`                        |
 | `digital-wallets`        | Enable digital wallet payment methods                              | `digital-wallets="true"`                                              | `false`                        |
+| `lightbox`               | Show regive in a modal dialog that opens once the banner is ready (see [Lightbox Option](#lightbox-option)) | `lightbox="true"`                                                     | `false`                        |
+| `lightbox-width`         | Width of the lightbox dialog: any CSS width. Always capped at 90% of the screen; an invalid value falls back to the default | `lightbox-width="600px"`                                              | `450px`                        |
 | `params`                 | Additional URL parameters to pass to the iFrame                    | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`                         |
 | `base-page`              | EN page ID to process the donation through                         | `base-page="12345"`                                                   | Same as original donation page |
 | `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"`  | `null`                         |
@@ -148,6 +150,26 @@ By default, there are no theme rules applied, and the component will use the the
 By default, Regive processes the additional donation through the same page as the original donation. However, you can specify a different base page for processing the regive donation using the `base-page` attribute. This allows you to route the additional donation through a specific page that may have different settings, configurations, or tracking parameters. In this case, the `base-page` should be set to the page ID of the desired page in Engaging Networks.
 
 **Note:** When using the `base-page` option, make sure that the specified page is properly set up to handle the donation (Contains all necessary fields for Engaging Networks to process the donation), and that it has the Regive script included on both pages. All instructions for "Page 1" of the donation form (such as adding the custom theme template) should be followed for the specified base page.
+
+#### Lightbox Option
+
+With `lightbox="true"`, regive renders the same banner (same themes, amounts and options) inside a modal dialog instead of in place of the `<regive>` tag:
+
+```html
+<regive
+  amount="5,10"
+  heading="Double your impact today!"
+  lightbox="true"
+  lightbox-width="500px"
+></regive>
+```
+
+- **Opens on its own once regive is ready.** No trigger button is needed. The dialog stays hidden while the banner loads. It opens only after the embedded page reports it is ready, which for digital wallets means after the wallet buttons appear. If regive exits (no stored payment, a frequency it cannot apply, a missing CAPTCHA callback, wallet buttons that never load), the dialog is removed without ever appearing. `hide-for-frequency` works as usual: nothing is rendered at all.
+- **Closing.** Donors can close it with the close button, the <kbd>Escape</kbd> key, or by clicking the dimmed backdrop. Focus stays inside the dialog while it is open and returns to where it was when it closes. The page behind it does not scroll while it is open.
+- **No closing mid-donation.** While a donation is processing, every way to close it is disabled, so the donor always sees the outcome. If the submission lands on a page that never reports back (for example a network error page), closing is allowed again 5 seconds after that page loads.
+- **After a successful donation.** The thank-you message shows inside the dialog, and the dialog closes itself 3.5 seconds later. Once closed (by the donor or after a donation) it never reopens on that page load, including after test mode resets the banner. `.showif-regive-success` and the `regive-success` class on the tag's `.en__component` work as they do without the lightbox.
+- **Stacking.** The dialog sits at `z-index: 99999`, below the confetti. A host page element with a higher `z-index` can cover it.
+- **Cross-origin base page.** If `base-page` is an absolute URL on a different domain, <kbd>Escape</kbd> only works while focus is on the dialog itself or its close button, not inside the banner. Browsers do not share keyboard events across domains.
 
 #### Min and Max Amounts
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture — Thank You Page (lightbox)</title>
+    <script>
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 2,
+        pageCount: 2,
+        campaignPageId: 12345,
+        clientId: 678,
+      };
+    </script>
+  </head>
+  <body>
+    <button type="button" id="host-focus">Host page button</button>
+    <!-- hide-for-frequency only matters when a test seeds an annual gift -->
+    <div class="en__component en__component--codeblock" id="host-component">
+      <h1>Thank you for your donation</h1>
+      <regive
+        amount="5,10"
+        heading="Double your impact"
+        thank-you-message="Thanks so much!"
+        hide-for-frequency="annual"
+        lightbox="true"
+      ></regive>
+    </div>
+    <div class="showif-regive-success" id="success-note">
+      Additional gift received
+    </div>
+    <!-- Makes the page scrollable so the scroll lock is observable -->
+    <div style="height: 3000px"></div>
+    <script src="/regive.js"></script>
+  </body>
+</html>

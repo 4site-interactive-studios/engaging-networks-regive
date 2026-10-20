@@ -44,8 +44,23 @@ const routes = [
   // Variant where the "Other" markup is broken: the fallback selector
   // matches a non-radio input - must come before the generic first-page route
   { pattern: /^\/page\/\d+\/withotherbroken\/1$/, file: "fixtures/donate-1-withother-broken.html" },
+  // Lightbox first pages - must come before the generic first-page route.
+  // /lightboxcaptcha/1 carries a mock reCAPTCHA, /lightboxwallet/1 renders a
+  // late digital wallet UI, /lightboxmonthly/1 is one-time only (so a
+  // monthly regive exits) and /lightboxecho/1 posts to /echo, a page that
+  // never reports back to the parent. /lightbox/1 and /lightboxtest/1 fall
+  // through to the generic page.
+  { pattern: /^\/page\/\d+\/lightboxcaptcha\/1$/, file: "fixtures/donate-1-captcha.html" },
+  { pattern: /^\/page\/\d+\/lightboxwallet\/1$/, file: "fixtures/donate-1-wallets.html" },
+  { pattern: /^\/page\/\d+\/lightboxmonthly\/1$/, file: "fixtures/donate-1-norecurr.html" },
+  { pattern: /^\/page\/\d+\/lightboxecho\/1$/, file: "fixtures/donate-1-selects.html" },
   // Any first donation page (both /donate/1 and /test/1 variants)
   { pattern: /^\/page\/\d+\/[a-zA-Z]+\/1$/, file: "fixtures/donate-1.html" },
+  // Thank-you pages with <regive lightbox="true">
+  { pattern: /^\/page\/\d+\/lightbox(?:echo)?\/2$/, file: "fixtures/page-2-lightbox.html" },
+  { pattern: /^\/page\/\d+\/lightbox(?:test|captcha)\/2$/, file: "fixtures/page-2-lightbox-test.html" },
+  { pattern: /^\/page\/\d+\/lightboxmonthly\/2$/, file: "fixtures/page-2-lightbox-monthly.html" },
+  { pattern: /^\/page\/\d+\/lightboxwallet\/2$/, file: "fixtures/page-2-lightbox-wallet.html" },
   // Thank-you page with the <regive> tag in normal mode
   { pattern: /^\/page\/\d+\/donate\/2$/, file: "fixtures/page-2.html" },
   // Thank-you page with the <regive source="original"> tag

@@ -186,6 +186,112 @@ body[data-regive-embedded="true"] {
   }
 }
 
+// Lightbox (opt-in via lightbox="true"): a modal dialog around the parent
+// page's .regive-container
+body[data-regive-lightbox-open="true"] {
+  overflow: hidden;
+}
+// Kept as its own rule so browsers without :has() drop only this one
+html:has(> body[data-regive-lightbox-open="true"]) {
+  overflow: hidden;
+}
+.regive-lightbox {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  // Below the confetti canvas (100000) so the celebration shows on top
+  z-index: 99999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2rem 0;
+  overflow-y: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  // Laid out (so the iframe gets its real width) but invisible and
+  // non-interactive until the child reports it is ready
+  &[data-regive-lightbox-state="pending"] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  &[hidden],
+  &[data-regive-lightbox-state="closed"] {
+    display: none;
+  }
+}
+.regive-lightbox__dialog {
+  position: relative;
+  box-sizing: border-box;
+  width: 450px;
+  max-width: 90%;
+  margin: auto;
+  padding: 0;
+  background-color: var(--regive-bg-color, #fff);
+  color: var(--regive-txt-color, #333);
+  border-radius: 4px;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  &:focus {
+    outline: none;
+  }
+  .regive-container {
+    margin: 0;
+  }
+}
+.regive-lightbox__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  // Above the container's loading overlay and thank-you panel
+  z-index: 1001;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  cursor: pointer;
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.1rem;
+    height: 2px;
+    background-color: currentColor;
+  }
+  &::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  &::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+  }
+  &:hover {
+    background: rgba(255, 255, 255, 0.9);
+  }
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  &[aria-disabled="true"] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+.regive-lightbox__focus-guard {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 body:not([data-regive-enabled="true"]) .showif-regive-enabled {
   display: none;
 }

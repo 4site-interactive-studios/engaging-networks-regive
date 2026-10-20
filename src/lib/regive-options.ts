@@ -47,6 +47,12 @@ export interface RegiveOptions {
   /** Enable digital wallet payment methods */
   digitalWallets?: boolean;
 
+  /** Show regive in a modal dialog that opens once the banner is ready */
+  lightbox?: boolean;
+
+  /** Width of the lightbox dialog - any CSS width (e.g. "600px"); capped at 90% of the screen */
+  lightboxWidth?: string;
+
   /** Enable test mode without actual form submission */
   test?: boolean;
 
