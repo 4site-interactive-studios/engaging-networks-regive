@@ -424,6 +424,94 @@ test.describe("keyboard and dismissal", () => {
   });
 });
 
+test.describe("close button", () => {
+  // WCAG relative luminance contrast between two rgb() colours
+  const contrast = (first: string, second: string) => {
+    const luminance = (color: string) => {
+      const [r, g, b] = (/\(([^)]+)\)/.exec(color) as RegExpExecArray)[1]
+        .split(",")
+        .slice(0, 3)
+        .map((part) => {
+          const channel = parseFloat(part) / 255;
+          return channel <= 0.03928
+            ? channel / 12.92
+            : ((channel + 0.055) / 1.055) ** 2.4;
+        });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const [light, dark] = [luminance(first), luminance(second)].sort(
+      (a, b) => b - a
+    );
+    return (light + 0.05) / (dark + 0.05);
+  };
+
+  test("is a white X on black, with distinct dark hover, focus and disabled states", async ({
+    page,
+  }) => {
+    await page.goto("/page/12345/lightboxtest/2");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeFocused();
+    const closeButton = dialog.getByRole("button", { name: "Close" });
+    await expect(closeButton).toHaveAttribute("type", "button");
+    const look = () =>
+      closeButton.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          stroke: getComputedStyle(element, "::before").backgroundColor,
+          otherStroke: getComputedStyle(element, "::after").backgroundColor,
+          shadow: style.boxShadow,
+          cursor: style.cursor,
+        };
+      });
+
+    const normal = await look();
+    expect(normal.background).toBe("rgb(0, 0, 0)");
+    expect(normal.stroke).toBe("rgb(255, 255, 255)");
+    expect(normal.otherStroke).toBe("rgb(255, 255, 255)");
+    expect(normal.shadow).toBe("none");
+    expect(contrast(normal.background, normal.stroke)).toBeGreaterThanOrEqual(
+      7
+    );
+
+    await closeButton.hover();
+    const hovered = await look();
+    expect(hovered.background).toBe("rgb(51, 51, 51)");
+    expect(hovered.stroke).toBe("rgb(255, 255, 255)");
+    expect(contrast(hovered.background, hovered.stroke)).toBeGreaterThanOrEqual(
+      7
+    );
+
+    // Keyboard focus draws a white-then-black ring, visible on light and
+    // dark dialogs alike
+    await page.mouse.move(0, 0);
+    await page.keyboard.press("Tab");
+    await expect(closeButton).toBeFocused();
+    const focused = await look();
+    expect(focused.background).toBe("rgb(0, 0, 0)");
+    expect(focused.shadow).toBe(
+      "rgb(255, 255, 255) 0px 0px 0px 2px, rgb(0, 0, 0) 0px 0px 0px 4px"
+    );
+
+    // Disabled while the donation processes: muted, still light on dark,
+    // and hovering it does not light it up
+    await page
+      .frameLocator("iframe.regive-iframe")
+      .locator(".regive-amount-btn")
+      .click();
+    await expect(closeButton).toHaveAttribute("aria-disabled", "true");
+    await closeButton.hover({ force: true });
+    const disabled = await look();
+    expect(disabled.background).toBe("rgb(89, 89, 89)");
+    expect(disabled.stroke).toBe("rgb(196, 196, 196)");
+    expect(disabled.cursor).toBe("not-allowed");
+    expect(
+      contrast(disabled.background, disabled.stroke)
+    ).toBeGreaterThanOrEqual(3);
+    expect(disabled.background).not.toBe(hovered.background);
+  });
+});
+
 test.describe("submission", () => {
   test("locks dismissal while processing, keeps the thank-you, closes, and never reopens", async ({
     page,

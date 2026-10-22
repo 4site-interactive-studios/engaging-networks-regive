@@ -60,6 +60,13 @@
         amount button after percentages are worked out, formatted as USD, and
         it only applies to custom templates — never the built-in themes.
 
+      LIGHTBOX ANIMATIONS
+        Tick lightbox and lightbox-animate. The built-in themes use the
+        default motions; test-theme on page 1 defines all three keyframes
+        (in, out when the donor closes, success-out after a gift) and
+        tier-champion overrides only the entrance, so the tier ladder shows a
+        gift-selected theme changing the motion.
+
       base-page: set at runtime by the harness.
         Regive normally derives the iframe URL by rewriting EN's
         /page/<id>/donate/<n> path back to /1. These test files have no such
@@ -515,7 +522,7 @@
         "height",
         "lightbox-width",
       ];
-      const REGIVE_FLAGS = ["test", "digital-wallets", "lightbox"];
+      const REGIVE_FLAGS = ["test", "digital-wallets", "lightbox", "lightbox-animate"];
 
       // Built-in themes, then the <template> themes carried by test-page-1.html.
       const BUILT_IN_THEMES = ["stacked", "button-right", "button-left", "button-top"];

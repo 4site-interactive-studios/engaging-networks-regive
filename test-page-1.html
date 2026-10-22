@@ -634,6 +634,15 @@
            * renders {{ask-amount}} in the copy AND from a CSS pseudo-element,
              covering the documented "works inside <style> blocks" behaviour
 
+         Lightbox animations (lightbox="true" + lightbox-animate="true"):
+           * test-theme defines all three hooks: regive-lightbox-in,
+             regive-lightbox-out (donor closes) and
+             regive-lightbox-success-out (closes itself after a gift)
+           * tier-champion overrides only regive-lightbox-in, so the tier
+             ladder shows a gift-selected theme changing the entrance while
+             its exits keep the defaults
+           * every other template, and the built-in themes, use the defaults
+
          Button rules are written as `.regive-embed .THEME .regive-amount-btn`
          (three classes) on purpose: the component's own stylesheet targets
          `body[data-regive-embedded="true"] .regive-amount-btn`, so a
@@ -683,6 +692,20 @@
           font-size: 1rem;
           min-width: 0;
           cursor: pointer;
+        }
+        /* Lightbox motions: drop in with a little wobble, sink away when
+           closed, pop and float off after a gift */
+        @keyframes regive-lightbox-in {
+          0% { opacity: 0; transform: translateY(-60px) rotate(-3deg); }
+          70% { opacity: 1; transform: translateY(8px) rotate(1deg); animation-timing-function: ease-in-out; }
+          100% { opacity: 1; transform: none; }
+        }
+        @keyframes regive-lightbox-out {
+          to { opacity: 0; transform: translateY(40px) scale(0.95); }
+        }
+        @keyframes regive-lightbox-success-out {
+          30% { transform: scale(1.04); }
+          100% { opacity: 0; transform: translateY(-60px) scale(0.9); }
         }
       </style>
       <div class="test-theme">
@@ -974,6 +997,12 @@
           font-weight: 700;
           min-width: 0;
           cursor: pointer;
+        }
+        /* A grander entrance for the top tier; the exits keep the defaults */
+        @keyframes regive-lightbox-in {
+          0% { opacity: 0; transform: scale(0.6) rotate(-6deg); }
+          60% { opacity: 1; transform: scale(1.08) rotate(1deg); }
+          100% { opacity: 1; transform: none; }
         }
       </style>
       <div class="tier-champion">
