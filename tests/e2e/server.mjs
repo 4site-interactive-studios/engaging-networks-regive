@@ -44,8 +44,40 @@ const routes = [
   // Variant where the "Other" markup is broken: the fallback selector
   // matches a non-radio input - must come before the generic first-page route
   { pattern: /^\/page\/\d+\/withotherbroken\/1$/, file: "fixtures/donate-1-withother-broken.html" },
+  // Lightbox first pages - must come before the generic first-page route.
+  // /lightboxcaptcha/1 carries a mock reCAPTCHA, /lightboxwallet/1 renders a
+  // late digital wallet UI, /lightboxmonthly/1 is one-time only (so a
+  // monthly regive exits) and /lightboxecho/1 posts to /echo, a page that
+  // never reports back to the parent. /lightbox/1 and /lightboxtest/1 fall
+  // through to the generic page.
+  { pattern: /^\/page\/\d+\/lightboxcaptcha\/1$/, file: "fixtures/donate-1-captcha.html" },
+  { pattern: /^\/page\/\d+\/lightboxwallet\/1$/, file: "fixtures/donate-1-wallets.html" },
+  { pattern: /^\/page\/\d+\/lightboxmonthly\/1$/, file: "fixtures/donate-1-norecurr.html" },
+  { pattern: /^\/page\/\d+\/lightboxecho\/1$/, file: "fixtures/donate-1-selects.html" },
+  // Animated lightbox first pages carrying motion templates (motion-calm,
+  // motion-bold, motion-unsafe) - must come before the generic first-page
+  // route. Page 24680 is the base page of /lightboxanimatebase/2.
+  // /lightboxanimate/1, /lightboxanimatereal/1 and /animatenolightbox/1
+  // fall through to the generic page (built-in theme).
+  { pattern: /^\/page\/\d+\/lightboxanimate(?:custom|rules|two|unsafe)\/1$/, file: "fixtures/donate-1-animate-themes.html" },
+  { pattern: /^\/page\/24680\/donate\/1$/, file: "fixtures/donate-1-animate-themes.html" },
   // Any first donation page (both /donate/1 and /test/1 variants)
   { pattern: /^\/page\/\d+\/[a-zA-Z]+\/1$/, file: "fixtures/donate-1.html" },
+  // Thank-you pages with <regive lightbox="true">
+  { pattern: /^\/page\/\d+\/lightbox(?:echo)?\/2$/, file: "fixtures/page-2-lightbox.html" },
+  { pattern: /^\/page\/\d+\/lightbox(?:test|captcha)\/2$/, file: "fixtures/page-2-lightbox-test.html" },
+  { pattern: /^\/page\/\d+\/lightboxmonthly\/2$/, file: "fixtures/page-2-lightbox-monthly.html" },
+  { pattern: /^\/page\/\d+\/lightboxwallet\/2$/, file: "fixtures/page-2-lightbox-wallet.html" },
+  // Thank-you pages with <regive lightbox="true" lightbox-animate="true">
+  { pattern: /^\/page\/\d+\/lightboxanimate\/2$/, file: "fixtures/page-2-lightbox-animate.html" },
+  { pattern: /^\/page\/\d+\/lightboxanimatecustom\/2$/, file: "fixtures/page-2-lightbox-animate-custom.html" },
+  { pattern: /^\/page\/\d+\/lightboxanimaterules\/2$/, file: "fixtures/page-2-lightbox-animate-rules.html" },
+  { pattern: /^\/page\/\d+\/lightboxanimatebase\/2$/, file: "fixtures/page-2-lightbox-animate-basepage.html" },
+  { pattern: /^\/page\/\d+\/lightboxanimatetwo\/2$/, file: "fixtures/page-2-lightbox-animate-two.html" },
+  { pattern: /^\/page\/\d+\/lightboxanimateunsafe\/2$/, file: "fixtures/page-2-lightbox-animate-unsafe.html" },
+  { pattern: /^\/page\/\d+\/lightboxanimatereal\/2$/, file: "fixtures/page-2-lightbox-animate-real.html" },
+  // Thank-you page with lightbox-animate but no lightbox
+  { pattern: /^\/page\/\d+\/animatenolightbox\/2$/, file: "fixtures/page-2-animate-nolightbox.html" },
   // Thank-you page with the <regive> tag in normal mode
   { pattern: /^\/page\/\d+\/donate\/2$/, file: "fixtures/page-2.html" },
   // Thank-you page with the <regive source="original"> tag

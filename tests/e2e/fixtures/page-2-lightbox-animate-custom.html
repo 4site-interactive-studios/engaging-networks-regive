@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture — Thank You Page (animated lightbox, custom template)</title>
+    <script>
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 2,
+        pageCount: 2,
+        campaignPageId: 12345,
+        clientId: 678,
+      };
+    </script>
+    <style>
+      /* Long exits leave a wide window to observe the closing phase */
+      :root {
+        --regive-lightbox-out-duration: 1500ms;
+        --regive-lightbox-success-out-duration: 1200ms;
+      }
+      /* The host page's own keyframes under a public hook name must not
+         drive any lightbox */
+      @keyframes regive-lightbox-in {
+        from { transform: translateX(999px); }
+        to { transform: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <button type="button" id="host-focus">Host page button</button>
+    <div class="en__component en__component--codeblock">
+      <h1>Thank you for your donation</h1>
+      <regive
+        amount="7"
+        heading="Give again"
+        thank-you-message="You did it again!"
+        theme="motion-bold"
+        test="true"
+        lightbox="true"
+        lightbox-animate="true"
+      ></regive>
+    </div>
+    <div style="height: 3000px"></div>
+    <script src="/regive.js"></script>
+  </body>
+</html>

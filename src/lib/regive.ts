@@ -1,5 +1,11 @@
 import { ENGrid } from "./engrid";
 import { RegiveOptions } from "./regive-options";
+import { RegiveLightbox } from "./regive-lightbox";
+import {
+  collectLightboxKeyframes,
+  lightboxKeyframeDefaults,
+  lightboxMotionHooks,
+} from "./regive-lightbox-keyframes";
 import "./confetti";
 
 const digitalWalletMethods = ["applepay", "googlepay", "stripedigitalwallet"]; // currently unsupported: "paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch", "daf"
@@ -23,6 +29,8 @@ export class Regive {
   private isExited: boolean = false;
   private isCaptchaUnlocked: boolean = false;
   private iFrameId: string | null = null;
+  // Lightboxes (lightbox="true") keyed by the .regive-container they wrap
+  private readonly lightboxes = new Map<HTMLElement, RegiveLightbox>();
 
   private readonly themes = [
     "button-right",
@@ -318,6 +326,10 @@ export class Regive {
     const digitalWalletsEnabled =
       this.options?.digitalWallets &&
       digitalWalletMethods.includes(paymentMethod);
+    // lightbox-animate: the built-in template carries the default motions,
+    // which a custom template's own @keyframes override (they come later)
+    const lightboxAnimate =
+      this.options?.lightbox === true && this.options?.lightboxAnimate === true;
     amounts.forEach((amount) => {
       const label = buttonLabel.replace(
         buttonLabelRegex,
@@ -405,6 +417,13 @@ export class Regive {
         margin: 0 20px;
       }
       `
+          : ""
+      }
+      ${
+        lightboxAnimate
+          ? lightboxMotionHooks
+              .map((hook) => lightboxKeyframeDefaults[hook])
+              .join("\n")
           : ""
       }
     </style>
@@ -507,6 +526,16 @@ export class Regive {
     }
     banner.innerHTML = template;
     document.body.appendChild(banner);
+    if (lightboxAnimate) {
+      // The parent animates its dialog with the rendered template's motions.
+      // Sent before "enabled" and "loaded": messages from one window arrive
+      // in order, so the parent has them before it opens the dialog.
+      this.sendMessageToParent("lightbox-animations", {
+        keyframes: collectLightboxKeyframes(banner, (message, emoji, data) =>
+          this.log(message, emoji, data)
+        ),
+      });
+    }
     // Create a resize observer to send the height to the parent every time the banner is resized
     const resizeObserver = new ResizeObserver(() => {
       const bannerHeight = banner.getBoundingClientRect().height;
@@ -1094,6 +1123,9 @@ export class Regive {
       const digitalWallets = this.isOptionEnabled(
         regiveTag.getAttribute("digital-wallets")
       );
+      const lightbox = this.isOptionEnabled(
+        regiveTag.getAttribute("lightbox")
+      );
       const optionsStr = this.getRegiveTagOptions(regiveTag);
 
       // Create iframe element
@@ -1184,6 +1216,27 @@ export class Regive {
         thankYouMessageElement.setAttribute("class", "regive-thank-you");
         thankYouMessageElement.innerHTML = `<h2>${thankYouMessage}</h2>`;
         regiveContainer.appendChild(thankYouMessageElement);
+      }
+
+      if (lightbox) {
+        this.log("Rendering Regive in a lightbox", "🟢");
+        const regiveLightbox = new RegiveLightbox({
+          container: regiveContainer,
+          iframe,
+          width: regiveTag.getAttribute("lightbox-width"),
+          label: regiveTag.getAttribute("heading"),
+          hostComponent: regiveTag.closest(".en__component"),
+          animate: this.isOptionEnabled(
+            regiveTag.getAttribute("lightbox-animate")
+          ),
+          log: (message, emoji, data) => this.log(message, emoji, data),
+        });
+        this.lightboxes.set(regiveContainer, regiveLightbox);
+        // The container goes straight into the (still hidden) dialog, so the
+        // iframe loads once - moving a loaded iframe would reload it
+        regiveTag.remove();
+        regiveLightbox.mount();
+        return;
       }
 
       // Replace the regive tag with our iframe
@@ -1387,7 +1440,9 @@ export class Regive {
         if (
           camelCaseKey === "test" ||
           camelCaseKey === "confetti" ||
-          camelCaseKey === "digitalWallets"
+          camelCaseKey === "digitalWallets" ||
+          camelCaseKey === "lightbox" ||
+          camelCaseKey === "lightboxAnimate"
         ) {
           if (this.isOptionEnabled(value)) {
             (this.options as any)[camelCaseKey] = true;
@@ -1668,17 +1723,23 @@ export class Regive {
 
       const data = event.data;
       this.log("Received message from child iframe", "📩", data);
+      // Only messages already matched to this container's own iframe (above)
+      // can drive its lightbox
+      const lightbox = this.lightboxes.get(iframeContainer);
       switch (data.action) {
         case "enabled":
           this.ENgrid.setBodyData("enabled", "true");
+          lightbox?.markEnabled();
           break;
         case "loaded":
           iframeContainer.classList.add("regive-loaded");
           iframeContainer.classList.remove("regive-loading");
+          lightbox?.markLoaded();
           break;
         case "loading":
           iframeContainer.classList.add("regive-loading");
           iframeContainer.classList.remove("regive-loaded");
+          lightbox?.markLoading();
           break;
         case "celebrate":
           this.celebrate(
@@ -1688,7 +1749,8 @@ export class Regive {
           break;
         case "success":
           const iframeContainerParent =
-            iframeContainer.closest(".en__component");
+            iframeContainer.closest(".en__component") ??
+            lightbox?.hostComponent;
           if (iframeContainerParent) {
             iframeContainerParent.classList.add("regive-success");
           }
@@ -1696,10 +1758,12 @@ export class Regive {
           if (iframeContainer.dataset.test !== "true") {
             this.clearStorage();
           }
+          lightbox?.markSuccess();
           break;
         case "reset":
           const iframeContainerParentReset =
-            iframeContainer.closest(".en__component");
+            iframeContainer.closest(".en__component") ??
+            lightbox?.hostComponent;
           if (iframeContainerParentReset) {
             iframeContainerParentReset.classList.remove("regive-success");
           }
@@ -1711,9 +1775,15 @@ export class Regive {
             (iframe as HTMLIFrameElement).style.height = data.value + "px";
             (iframe as HTMLIFrameElement).style.width = "100%";
             this.log("Iframe height set to", "📏", data.value);
+          } else if (lightbox?.holdsContent()) {
+            // The lightbox is showing the processing state or the thank-you
+            // message, which must stay visible
+            this.log("Keeping the lightbox content visible", "📏");
           } else {
             this.log("Hiding iframe container", "🙈");
             iframeContainer.style.display = "none";
+            // Nothing left to show - never leave an empty dialog open
+            lightbox?.close();
           }
           break;
         case "exit":
@@ -1724,7 +1794,20 @@ export class Regive {
           }
           this.log("Child iframe requested exit", "🚪");
           this.ENgrid.setBodyData("enabled", "false");
+          if (lightbox) {
+            lightbox.remove();
+            this.lightboxes.delete(iframeContainer);
+          }
           iframeContainer.remove();
+          break;
+        case "lightbox-animations":
+          // The rendered template's motions. Only this container's own
+          // lightbox may take them, and it validates them before use.
+          if (lightbox) {
+            lightbox.acceptAnimations(data.value);
+          } else {
+            this.log("Ignoring lightbox animations - no lightbox here", "⚠️");
+          }
           break;
         default:
           this.log("Unknown action received from child iframe", "🔴", data);

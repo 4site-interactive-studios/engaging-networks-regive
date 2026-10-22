@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture — Donation Page 1 (lightbox animation templates)</title>
+    <script>
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 1,
+        pageCount: 2,
+        campaignPageId: 12345,
+        clientId: 678,
+      };
+    </script>
+    <!-- Page 1's own stylesheet also defines a hook name. It is not part of
+         the rendered template, so it must never reach the parent. -->
+    <style>
+      @keyframes regive-lightbox-out {
+        from { opacity: 1; }
+        to { opacity: 0; transform: translateX(777px); }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Overrides the entrance only: dismissal and success exits keep the
+         built-in defaults -->
+    <template id="motion-calm">
+      <style>
+        @keyframes regive-lightbox-in {
+          from { opacity: 0; transform: translateX(-240px); }
+          to { opacity: 1; transform: translateX(0px); }
+        }
+      </style>
+      <div class="motion-calm">
+        {{heading}}
+        <p class="motion-ask">Calm {{ask-amount}}</p>
+        {{button}}
+      </div>
+    </template>
+    <!-- Overrides all three hooks with distinctive transforms -->
+    <template id="motion-bold">
+      <style>
+        .motion-bold .motion-ask::after {
+          content: " ({{ask-amount}})";
+        }
+        @keyframes regive-lightbox-in {
+          0% { opacity: 0; transform: translateY(-200px) rotate(-12deg); }
+          100% { opacity: 1; transform: translateY(0px) rotate(0deg); }
+        }
+        @keyframes regive-lightbox-out {
+          0% { opacity: 1; transform: translateY(0px); }
+          100% { opacity: 0; transform: translateY(120px); }
+        }
+        @keyframes regive-lightbox-success-out {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: translateY(-120px) scale(1.2); }
+        }
+      </style>
+      <div class="motion-bold">
+        {{heading}}
+        <p class="motion-ask">Bold {{ask-amount}}</p>
+        {{button}}
+      </div>
+    </template>
+    <!-- An entrance the parent must refuse (it would fetch a URL); the child
+         falls back to the default entrance and keeps the valid exit -->
+    <template id="motion-unsafe">
+      <style>
+        @keyframes regive-lightbox-in {
+          from { filter: url(https://evil.example/filter.svg#x); }
+          to { filter: none; }
+        }
+        @keyframes regive-lightbox-out {
+          from { opacity: 1; }
+          to { opacity: 0; transform: rotate(30deg); }
+        }
+      </style>
+      <div class="motion-unsafe">
+        {{heading}}
+        {{button}}
+      </div>
+    </template>
+    <form
+      class="en__component"
+      action="/page/12345/donate/2?chain&amp;regive-amount=5%2C10"
+      method="post"
+    >
+      <div class="en__component en__component--formblock">
+        <div class="en__field en__mandatory">
+          <input
+            class="en__field__input"
+            type="text"
+            name="supporter.firstName"
+            value="Ada"
+          />
+        </div>
+        <div class="en__field en__mandatory">
+          <input
+            class="en__field__input"
+            type="email"
+            name="supporter.emailAddress"
+            value="ada@example.org"
+          />
+        </div>
+        <input type="hidden" name="transaction.paymenttype" value="" />
+        <input type="hidden" name="supporter.appealCode" value="" />
+        <input type="hidden" name="transaction.ccnumber" value="" />
+        <input type="hidden" name="transaction.ccvv" value="" />
+        <input type="hidden" name="transaction.ccexpire" value="" />
+        <input type="hidden" name="transaction.vgs.cardType" value="" />
+        <input type="radio" name="transaction.donationAmt" value="5" />
+        <input type="radio" name="transaction.donationAmt" value="10" />
+        <input type="text" name="transaction.donationAmt.other" value="" />
+        <input type="radio" name="transaction.recurrpay" value="N" checked />
+        <input type="radio" name="transaction.recurrpay" value="Y" />
+        <select name="transaction.recurrfreq">
+          <option value="ONETIME">One-time</option>
+          <option value="MONTHLY">Monthly</option>
+          <option value="ANNUAL">Annual</option>
+        </select>
+      </div>
+      <div class="en__component en__submit">
+        <button type="submit">Donate</button>
+      </div>
+    </form>
+    <script src="/regive.js"></script>
+  </body>
+</html>

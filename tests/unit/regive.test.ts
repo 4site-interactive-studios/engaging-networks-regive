@@ -10,6 +10,8 @@ type RegiveInternals = {
   formatAskAmount(amount: string | undefined): string;
   processAmounts(options: RegiveOptions): void;
   getTheme(options: RegiveOptions): string;
+  loadOptionsFromUrl(): void;
+  options: RegiveOptions | undefined;
 };
 
 // With no pageJson in the document the constructor exits immediately
@@ -308,5 +310,30 @@ describe("getTheme", () => {
       themeRules: "abc:broken,100:big",
     };
     expect(regive.getTheme(options)).toBe("big");
+  });
+});
+
+describe("loadOptionsFromUrl", () => {
+  const optionsFrom = (search: string) => {
+    window.history.replaceState({}, "", `/?${search}`);
+    regive.loadOptionsFromUrl();
+    return regive.options as RegiveOptions;
+  };
+
+  it("parses lightbox-animate with the same boolean conventions as lightbox", () => {
+    expect(
+      optionsFrom("regive-lightbox=true&regive-lightbox-animate=true")
+    ).toMatchObject({ lightbox: true, lightboxAnimate: true });
+    expect(optionsFrom("regive-lightbox-animate=yes").lightboxAnimate).toBe(
+      true
+    );
+    expect(optionsFrom("regive-lightbox-animate=1").lightboxAnimate).toBe(true);
+    expect(optionsFrom("regive-lightbox-animate=false").lightboxAnimate).toBe(
+      false
+    );
+  });
+
+  it("leaves lightbox-animate off by default", () => {
+    expect(optionsFrom("regive-lightbox=true").lightboxAnimate).toBeUndefined();
   });
 });

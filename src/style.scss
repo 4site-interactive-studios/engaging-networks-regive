@@ -186,6 +186,193 @@ body[data-regive-embedded="true"] {
   }
 }
 
+// Lightbox (opt-in via lightbox="true"): a modal dialog around the parent
+// page's .regive-container
+body[data-regive-lightbox-open="true"] {
+  overflow: hidden;
+}
+// Kept as its own rule so browsers without :has() drop only this one
+html:has(> body[data-regive-lightbox-open="true"]) {
+  overflow: hidden;
+}
+.regive-lightbox {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  // Below the confetti canvas (100000) so the celebration shows on top
+  z-index: 99999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2rem 0;
+  overflow-y: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  // Laid out (so the iframe gets its real width) but invisible and
+  // non-interactive until the child reports it is ready
+  &[data-regive-lightbox-state="pending"] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  &[hidden],
+  &[data-regive-lightbox-state="closed"] {
+    display: none;
+  }
+}
+.regive-lightbox__dialog {
+  position: relative;
+  box-sizing: border-box;
+  width: 450px;
+  max-width: 90%;
+  margin: auto;
+  padding: 0;
+  background-color: var(--regive-bg-color, #fff);
+  color: var(--regive-txt-color, #333);
+  border-radius: 4px;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  &:focus {
+    outline: none;
+  }
+  .regive-container {
+    margin: 0;
+  }
+}
+.regive-lightbox__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  // Above the container's loading overlay and thank-you panel
+  z-index: 1001;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  // A white X on black in every state; the X is drawn in currentColor
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.1rem;
+    height: 2px;
+    background-color: currentColor;
+  }
+  &::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  &::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+  }
+  &:hover {
+    background: #333;
+  }
+  // A white ring then a black one, so focus shows on light and dark dialogs.
+  // The transparent outline is what forced-colors mode draws instead.
+  &:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 4px #000;
+  }
+  // Muted while a donation processes: still light on dark (about 4:1)
+  &[aria-disabled="true"],
+  &[aria-disabled="true"]:hover {
+    background: #595959;
+    color: #c4c4c4;
+    cursor: not-allowed;
+  }
+}
+.regive-lightbox__focus-guard {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+// Lightbox motion (opt-in via lightbox-animate="true"). Regive sets
+// data-regive-lightbox-motion while a motion plays. The dialog runs this
+// lightbox's private copy of the template's @keyframes, which Regive points
+// the --regive-lightbox-*-keyframes properties at; the backdrop fades. Host
+// pages can change the lengths with --regive-lightbox-in-duration,
+// --regive-lightbox-out-duration and --regive-lightbox-success-out-duration.
+@keyframes regive-lightbox-backdrop-in {
+  from {
+    background-color: rgba(0, 0, 0, 0);
+  }
+}
+@keyframes regive-lightbox-backdrop-out {
+  to {
+    background-color: rgba(0, 0, 0, 0);
+  }
+}
+@mixin regive-lightbox-motion($backdrop, $keyframes, $duration, $easing) {
+  animation-name: $backdrop;
+  animation-duration: $duration;
+  animation-timing-function: $easing;
+  animation-delay: 0s;
+  animation-iteration-count: 1;
+  animation-direction: normal;
+  animation-fill-mode: both;
+  .regive-lightbox__dialog {
+    animation-name: $keyframes;
+    animation-duration: $duration;
+    animation-timing-function: $easing;
+    animation-delay: 0s;
+    animation-iteration-count: 1;
+    animation-direction: normal;
+    animation-fill-mode: both;
+  }
+}
+.regive-lightbox[data-regive-lightbox-motion="in"] {
+  @include regive-lightbox-motion(
+    regive-lightbox-backdrop-in,
+    var(--regive-lightbox-in-keyframes, none),
+    var(--regive-lightbox-in-duration, 450ms),
+    ease-out
+  );
+}
+.regive-lightbox[data-regive-lightbox-motion="out"] {
+  @include regive-lightbox-motion(
+    regive-lightbox-backdrop-out,
+    var(--regive-lightbox-out-keyframes, none),
+    var(--regive-lightbox-out-duration, 250ms),
+    ease-in
+  );
+}
+.regive-lightbox[data-regive-lightbox-motion="success-out"] {
+  @include regive-lightbox-motion(
+    regive-lightbox-backdrop-out,
+    var(--regive-lightbox-success-out-keyframes, none),
+    var(--regive-lightbox-success-out-duration, 400ms),
+    ease-in
+  );
+}
+// While the exit plays, the dialog's contents take no pointer input (they
+// are also inert); the backdrop still covers the page
+.regive-lightbox[data-regive-lightbox-state="closing"]
+  .regive-lightbox__dialog
+  > * {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .regive-lightbox[data-regive-lightbox-motion],
+  .regive-lightbox[data-regive-lightbox-motion] .regive-lightbox__dialog {
+    animation: none;
+  }
+}
+
 body:not([data-regive-enabled="true"]) .showif-regive-enabled {
   display: none;
 }
