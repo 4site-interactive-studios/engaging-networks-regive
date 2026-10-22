@@ -143,6 +143,8 @@ By default, there are no theme rules applied, and the component will use the the
 
 **Note:** When `hide-for-frequency` hides the banner, regive also clears its stored payment tokens. This assumes one `<regive>` tag per page: with several tags, the skipped tag's cleanup would prevent the remaining tags from rendering (their iframes would find no tokens and exit).
 
+**Note:** If the donation page has a card holder name field (`supporter.creditCardHolderName`), regive remembers the name from the first gift and fills it back in for the additional gift, because Engaging Networks does not prefill it. Pages without that field are unaffected, and no attribute is needed.
+
 #### Base Page Option
 
 By default, Regive processes the additional donation through the same page as the original donation. However, you can specify a different base page for processing the regive donation using the `base-page` attribute. This allows you to route the additional donation through a specific page that may have different settings, configurations, or tracking parameters. In this case, the `base-page` should be set to the page ID of the desired page in Engaging Networks.

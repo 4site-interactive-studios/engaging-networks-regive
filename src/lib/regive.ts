@@ -3,7 +3,7 @@ import { RegiveOptions } from "./regive-options";
 import "./confetti";
 
 const digitalWalletMethods = ["applepay", "googlepay", "stripedigitalwallet"]; // currently unsupported: "paypaltouch","paypal-touch","paypal-one-touch","paypal-onetouch", "daf"
-const cardMethods = ["card", "cards", "VI", "MC", "DS", "AX"];
+const cardMethods = ["card", "cards", "CC", "VI", "MC", "DS", "AX"];
 // Sanity ceiling for the gift amount - guards against garbage input (e.g. an
 // encoded merge tag leaking through) resolving to an absurd ask
 const maxGiftAmount = 100000;
@@ -143,6 +143,11 @@ export class Regive {
           ? this.options?.testMethod
           : this.detectPaymentMethod();
       this.log("Detected payment method", "💳", paymentMethod);
+      // Must run before the required fields check: selecting the card payment
+      // type can reveal a mandatory card holder name that EN does not prefill
+      if (cardMethods.includes(paymentMethod)) {
+        this.restoreCardHolderName();
+      }
       if (
         ((digitalWalletMethods.includes(paymentMethod) &&
           this.options?.digitalWallets) ||
@@ -929,6 +934,18 @@ export class Regive {
     });
   }
 
+  // Optional: most pages have no card holder name field, so this is a no-op
+  // when the field or the stored value is missing
+  private restoreCardHolderName() {
+    const cardHolderName = localStorage.getItem("regive-cardholder");
+    const field = this.ENgrid.getField(
+      "supporter.creditCardHolderName"
+    ) as HTMLInputElement | null;
+    if (!field || !cardHolderName || field.value) return;
+    field.value = cardHolderName;
+    this.log("Restored the card holder name from the first donation", "💾");
+  }
+
   private wasSubmittedViaRegive(): boolean {
     const submittedPage = localStorage.getItem("regive-submitted");
     const currentPage = this.ENgrid.getPageID();
@@ -1031,6 +1048,7 @@ export class Regive {
     localStorage.removeItem("regive-donation-amt");
     localStorage.removeItem("regive-appealcode");
     localStorage.removeItem("regive-frequency");
+    localStorage.removeItem("regive-cardholder");
   }
 
   private appendToUrl(url: string, params: string): string {
@@ -1258,6 +1276,7 @@ export class Regive {
         );
       }
       saveFieldToStorage("supporter.appealCode", "regive-appealcode");
+      saveFieldToStorage("supporter.creditCardHolderName", "regive-cardholder");
       saveFrequencyToStorage();
     });
 

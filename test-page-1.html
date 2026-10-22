@@ -574,6 +574,21 @@
           </div>
         </div>
 
+        <!-- Optional: most EN pages have no card holder name. When a page has
+             one, Regive saves it here and restores it in the chained iframe,
+             where EN does not prefill it (the harness does not either). -->
+        <div class="en__field en__field--text en__field--creditCardHolderName">
+          <label class="en__field__label" for="creditCardHolderName">Name on card</label>
+          <div class="en__field__element en__field__element--text">
+            <input
+              type="text"
+              id="creditCardHolderName"
+              name="supporter.creditCardHolderName"
+              class="en__field__input en__field__input--text"
+            />
+          </div>
+        </div>
+
         <div class="en__field en__field--select en__field--ccexpire">
           <label class="en__field__label" for="ccexpire-month">Card expiry</label>
           <div class="en__field__element en__field__element--select">
@@ -1140,6 +1155,8 @@
           const field = form.querySelector(`[name="${name}"]`);
           if (field) field.value = DONOR_FALLBACK[name];
         });
+        const cardHolderName = form.querySelector('[name="supporter.creditCardHolderName"]');
+        if (cardHolderName) cardHolderName.value = "Test Donor";
       }
 
       // ---- keep Regive's MutationObserver honest ---------------------------
@@ -1240,6 +1257,7 @@
         "regive-donation-amt",
         "regive-appealcode",
         "regive-frequency",
+        "regive-cardholder",
         "regive-submitted",
         "regive-height",
       ];
