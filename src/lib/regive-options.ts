@@ -53,6 +53,9 @@ export interface RegiveOptions {
   /** Width of the lightbox dialog - any CSS width (e.g. "600px"); capped at 90% of the screen */
   lightboxWidth?: string;
 
+  /** Animate the lightbox in and out with the selected template's @keyframes regive-lightbox-in / -out / -success-out (only with lightbox; default false) */
+  lightboxAnimate?: boolean;
+
   /** Enable test mode without actual form submission */
   test?: boolean;
 

@@ -131,6 +131,7 @@ By default, there are no theme rules applied, and the component will use the the
 | `digital-wallets`        | Enable digital wallet payment methods                              | `digital-wallets="true"`                                              | `false`                        |
 | `lightbox`               | Show regive in a modal dialog that opens once the banner is ready (see [Lightbox Option](#lightbox-option)) | `lightbox="true"`                                                     | `false`                        |
 | `lightbox-width`         | Width of the lightbox dialog: any CSS width. Always capped at 90% of the screen; an invalid value falls back to the default | `lightbox-width="600px"`                                              | `450px`                        |
+| `lightbox-animate`       | Animate the lightbox in and out with the theme's CSS keyframes (see [Lightbox Animations](#lightbox-animations)). Only has an effect together with `lightbox="true"` | `lightbox-animate="true"`                                             | `false`                        |
 | `params`                 | Additional URL parameters to pass to the iFrame                    | `params="utm_source=thank_you&utm_medium=regive&utm_campaign=spring"` | `null`                         |
 | `base-page`              | EN page ID to process the donation through                         | `base-page="12345"`                                                   | Same as original donation page |
 | `ignore-required-fields` | Comma-separated list of mandatory field names to ignore when empty | `ignore-required-fields="supporter.firstName,supporter.phoneNumber"`  | `null`                         |
@@ -165,11 +166,96 @@ With `lightbox="true"`, regive renders the same banner (same themes, amounts and
 ```
 
 - **Opens on its own once regive is ready.** No trigger button is needed. The dialog stays hidden while the banner loads. It opens only after the embedded page reports it is ready, which for digital wallets means after the wallet buttons appear. If regive exits (no stored payment, a frequency it cannot apply, a missing CAPTCHA callback, wallet buttons that never load), the dialog is removed without ever appearing. `hide-for-frequency` works as usual: nothing is rendered at all.
-- **Closing.** Donors can close it with the close button, the <kbd>Escape</kbd> key, or by clicking the dimmed backdrop. Focus stays inside the dialog while it is open and returns to where it was when it closes. The page behind it does not scroll while it is open.
+- **Closing.** Donors can close it with the close button, the <kbd>Escape</kbd> key, or by clicking the dimmed backdrop. Focus stays inside the dialog while it is open and returns to where it was when it closes. The page behind it does not scroll while it is open. The close button is a white X on a black circle: dark grey while hovered, muted grey while a donation is processing, with a white-and-black ring when it has keyboard focus.
 - **No closing mid-donation.** While a donation is processing, every way to close it is disabled, so the donor always sees the outcome. If the submission lands on a page that never reports back (for example a network error page), closing is allowed again 5 seconds after that page loads.
 - **After a successful donation.** The thank-you message shows inside the dialog, and the dialog closes itself 3.5 seconds later. Once closed (by the donor or after a donation) it never reopens on that page load, including after test mode resets the banner. `.showif-regive-success` and the `regive-success` class on the tag's `.en__component` work as they do without the lightbox.
 - **Stacking.** The dialog sits at `z-index: 99999`, below the confetti. A host page element with a higher `z-index` can cover it.
 - **Cross-origin base page.** If `base-page` is an absolute URL on a different domain, <kbd>Escape</kbd> only works while focus is on the dialog itself or its close button, not inside the banner. Browsers do not share keyboard events across domains.
+
+#### Lightbox Animations
+
+Add `lightbox-animate="true"` next to `lightbox="true"` and the dialog animates instead of appearing and disappearing at once: the backdrop fades in and out, and the dialog grows into place with one gentle bounce. Without the attribute the lightbox behaves exactly as described above.
+
+```html
+<regive
+  amount="5,10"
+  heading="Double your impact today!"
+  lightbox="true"
+  lightbox-animate="true"
+></regive>
+```
+
+The motions are CSS `@keyframes` with three reserved names, one for each moment:
+
+| Keyframes                     | Plays when                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `regive-lightbox-in`          | The dialog opens, once the banner is ready                                          |
+| `regive-lightbox-out`         | The donor closes it: the close button, the <kbd>Escape</kbd> key, or a backdrop click |
+| `regive-lightbox-success-out` | It closes itself after a successful donation (the thank-you message still shows for 3.5 seconds first) |
+
+The built-in themes carry default keyframes for all three in their CSS block. A custom template only needs the ones it wants to change; the rest keep the defaults. The two exits can share one motion: give the same keyframes both names.
+
+**Rigging a custom template.** Put the keyframes in the `<style>` block of the theme's `<template>`, on **page 1 of the donation form** (or on the `base-page`), where the rest of the custom theme lives:
+
+```html
+<template id="my-custom-theme">
+  <style>
+    .my-custom-theme {
+      padding: 20px;
+    }
+    @keyframes regive-lightbox-in {
+      0% { opacity: 0; transform: translateY(40px) scale(0.9); }
+      70% { opacity: 1; transform: translateY(-6px) scale(1.02); animation-timing-function: ease-in-out; }
+      100% { opacity: 1; transform: none; }
+    }
+    @keyframes regive-lightbox-out {
+      to { opacity: 0; transform: scale(0.9); }
+    }
+    @keyframes regive-lightbox-success-out {
+      to { opacity: 0; transform: translateY(-40px); }
+    }
+  </style>
+  <div class="my-custom-theme">
+    {{heading}}
+    <div class="regive-captcha-container"></div>
+    {{button}}
+  </div>
+</template>
+```
+
+```html
+<regive
+  amount="8"
+  theme="my-custom-theme"
+  lightbox="true"
+  lightbox-animate="true"
+></regive>
+```
+
+The keyframes come from whichever template actually renders, including one picked by `theme-rules`.
+
+**How the keyframes reach the dialog.** The template renders inside the page 1 iframe, but the dialog it animates sits on the Thank You page. When the banner renders, regive reads the three keyframes from the banner's own `<style>` blocks and sends them to the Thank You page in a `lightbox-animations` message, before the banner reports that it is ready. The Thank You page accepts the message only from its own lightbox's iframe and only before the dialog opens. It validates every rule, rewrites it under a name private to that lightbox, and only then adds it to the page. One template's motion cannot change another lightbox or the host page's own keyframes.
+
+A rule may only contain keyframe selectors (`from`, `to`, percentages) and the properties `opacity`, `transform`, `transform-origin`, `translate`, `scale`, `rotate`, `filter` and `animation-timing-function`, using transform, colour, math and easing functions. URLs, `@import`, `var()`, comments, quotes, `!important` and every other property are refused. A rule that breaks these limits falls back to the default motion, with a warning in [debug mode](#debug-mode). Keep the keyframes at the top level of the `<style>` block, not inside `@media`.
+
+**Timing and easing.**
+
+- The shape and the easing live in the keyframes: the keyframe percentages, plus `animation-timing-function` inside a keyframe for the segment that starts there. Segments without one ease out on the way in and ease in on the way out.
+- The length is set on the Thank You page, with CSS custom properties. These are the defaults:
+  ```css
+  :root {
+    --regive-lightbox-in-duration: 450ms;
+    --regive-lightbox-out-duration: 250ms;
+    --regive-lightbox-success-out-duration: 400ms;
+  }
+  ```
+  The backdrop fade uses the same lengths.
+- End the entrance at the dialog's resting state (`opacity: 1` and no transform). When it finishes, regive removes the animation and the dialog returns to its normal style.
+- No motion holds the dialog for more than 2 seconds. Longer or infinite animations are cut off there.
+
+**While it closes.** During an exit the dialog stays on screen and the page behind it stays covered and locked, but the banner and the close button stop responding, so nothing can be clicked twice and no second donation can start. When the exit ends, the dialog is hidden for good, focus returns to where it was, and the page scrolls again. When regive has nothing left to show, or the embedded page exits, the dialog closes at once with no exit motion.
+
+**Fallbacks and reduced motion.** If an animation cannot run (missing keyframes, a zero length, or page CSS that switches it off), the dialog opens or closes at once instead of waiting for it. Donors whose device asks for reduced motion (`prefers-reduced-motion: reduce`) get no motion at all, and turning that setting on while a motion plays finishes it immediately.
 
 #### Min and Max Amounts
 
@@ -541,6 +627,8 @@ The "tier ladder" preset in the panel wires them up as `theme="tier-supporter"` 
 Remember that test mode substitutes its $50 preview gift when no gift amount is available, so rules still evaluate against $50. Setting `min-amount` previews the fallback state instead, and rules are ignored there.
 
 All five templates on page 1, the four tiers plus a minimal `test-theme`, print `{{ask-amount}}` twice: once in their copy, once from a CSS pseudo-element. The panel reads both values back, which covers the substitution surviving inside a `<style>` block. Built-in themes get no `{{ask-amount}}` substitution, and the readout says so when one is active.
+
+To try [lightbox animations](#lightbox-animations), tick `lightbox` and `lightbox-animate` in the panel. `test-theme` defines all three keyframes, `tier-champion` overrides only the entrance (so the tier ladder shows a gift-selected theme changing the motion), and the other templates and the built-in themes use the defaults.
 
 ### What the pages fake
 
