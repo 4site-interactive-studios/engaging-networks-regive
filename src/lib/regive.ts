@@ -12,6 +12,9 @@ const maxRegiveAmount = 100000;
 // Default gift used in test mode to preview dynamic asks when no real gift is
 // available (and no min-amount is set to preview the fallback state)
 const defaultTestGiftAmount = 50;
+// Shared window for the reCAPTCHA component and its callbacks to become ready
+const captchaGracePeriod = 5000;
+const captchaCallbackRetryInterval = 100;
 
 export class Regive {
   private readonly ENgrid = ENGrid;
@@ -543,6 +546,7 @@ export class Regive {
     // Send banner height to parent
     this.sendHeightToParent();
     if (hasCaptcha) {
+      const captchaDeadline = Date.now() + captchaGracePeriod;
       // Teleport '.en__captcha' to '.regive-captcha-container'
       const captchaContainer = banner.querySelector(
         ".regive-captcha-container"
@@ -564,7 +568,7 @@ export class Regive {
           "🟢"
         );
         captchaContainer.appendChild(captcha);
-        this.overrideCaptchaCallbacks(captcha);
+        this.overrideCaptchaCallbacks(captcha, captchaDeadline);
         this.sendHeightToParent();
       } else {
         this.log(
@@ -583,7 +587,7 @@ export class Regive {
             clearTimeout(timer);
             observer.disconnect();
             captchaContainer.appendChild(captchaElement);
-            this.overrideCaptchaCallbacks(captchaElement);
+            this.overrideCaptchaCallbacks(captchaElement, captchaDeadline);
             this.sendHeightToParent();
           }
         });
@@ -598,18 +602,18 @@ export class Regive {
           ) as HTMLElement | null;
           if (recaptcha && recaptcha.closest(".en__captcha")) {
             this.log(
-              "CAPTCHA not found in the page after 4 seconds, but g-recaptcha is present and has a parent with class 'en__captcha'. Assuming CAPTCHA is required, exiting.",
+              "CAPTCHA not found in the page after 5 seconds, but g-recaptcha is present and has a parent with class 'en__captcha'. Assuming CAPTCHA is required, exiting.",
               "🔴"
             );
             this.exit();
           } else {
             this.log(
-              "CAPTCHA not found in the page after 4 seconds, but g-recaptcha is not present or does not have a parent with class 'en__captcha'. Assuming CAPTCHA is optional, proceeding without it.",
+              "CAPTCHA not found in the page after 5 seconds, but g-recaptcha is not present or does not have a parent with class 'en__captcha'. Assuming CAPTCHA is optional, proceeding without it.",
               "⚠️"
             );
             this.unlockButtons();
           }
-        }, 5000);
+        }, Math.max(0, captchaDeadline - Date.now()));
       }
     }
     if (digitalWalletsEnabled) {
@@ -730,7 +734,10 @@ export class Regive {
     this.isCaptchaUnlocked = false;
   }
 
-  private overrideCaptchaCallbacks(captcha: HTMLElement) {
+  private overrideCaptchaCallbacks(
+    captcha: HTMLElement,
+    captchaDeadline: number
+  ) {
     // Get the g-recaptcha element inside the captcha container
     const recaptcha = captcha.querySelector(
       ".g-recaptcha"
@@ -748,45 +755,84 @@ export class Regive {
     // invocation time (verified with reCAPTCHA v2). If the widget re-renders
     // (e.g. EN step reloads), the override must be re-applied.
     const globalWindow = window as Record<string, any>;
-    const originalCallback = recaptcha.getAttribute("data-callback");
-    const originalExpiredCallback = recaptcha.getAttribute(
-      "data-expired-callback"
+    let observer: MutationObserver | null = null;
+    let retryInterval: number | null = null;
+    let graceTimer: number | null = null;
+
+    const stopWaiting = () => {
+      observer?.disconnect();
+      if (retryInterval !== null) window.clearInterval(retryInterval);
+      if (graceTimer !== null) window.clearTimeout(graceTimer);
+    };
+
+    const applyCallbacks = (): boolean => {
+      const originalCallback = recaptcha.getAttribute("data-callback");
+      if (
+        !originalCallback ||
+        typeof globalWindow[originalCallback] !== "function"
+      ) {
+        return false;
+      }
+      // Run our handle Captcha function first, then call the original callback
+      const original = globalWindow[originalCallback] as (
+        token: string
+      ) => void;
+      globalWindow[originalCallback] = (token: string) => {
+        this.unlockButtons();
+        original(token);
+      };
+      const originalExpiredCallback = recaptcha.getAttribute(
+        "data-expired-callback"
+      );
+      if (
+        originalExpiredCallback &&
+        typeof globalWindow[originalExpiredCallback] === "function"
+      ) {
+        // Run our handle Captcha expired function first, then call the original expired callback
+        const originalExpired = globalWindow[
+          originalExpiredCallback
+        ] as () => void;
+        globalWindow[originalExpiredCallback] = () => {
+          this.lockButtons();
+          originalExpired();
+        };
+      } else {
+        this.log(
+          `g-recaptcha data-expired-callback "${originalExpiredCallback}" is missing or not a global function. Buttons will not re-lock on token expiry.`,
+          "⚠️"
+        );
+      }
+      stopWaiting();
+      return true;
+    };
+
+    if (applyCallbacks()) return;
+
+    this.log(
+      "g-recaptcha data-callback is not ready. Waiting up to 5 seconds for the attribute and global function.",
+      "⚠️"
     );
-    if (
-      !originalCallback ||
-      typeof globalWindow[originalCallback] !== "function"
-    ) {
+    observer = new MutationObserver(() => {
+      applyCallbacks();
+    });
+    observer.observe(recaptcha, {
+      attributes: true,
+      attributeFilter: ["data-callback"],
+    });
+    // Attributes are observable, but assigning a global function is not. Poll
+    // as a fallback for pages that define the callback after the attribute.
+    retryInterval = window.setInterval(() => {
+      applyCallbacks();
+    }, captchaCallbackRetryInterval);
+    graceTimer = window.setTimeout(() => {
+      stopWaiting();
+      const originalCallback = recaptcha.getAttribute("data-callback");
       this.log(
-        `g-recaptcha data-callback "${originalCallback}" is missing or not a global function. Amount buttons would never unlock, aborting.`,
+        `g-recaptcha data-callback "${originalCallback}" is still missing or not a global function after 5 seconds. Amount buttons would never unlock, aborting.`,
         "🔴"
       );
       this.exit();
-      return;
-    }
-    // Run our handle Captcha function first, then call the original callback
-    const original = globalWindow[originalCallback] as (token: string) => void;
-    globalWindow[originalCallback] = (token: string) => {
-      this.unlockButtons();
-      original(token);
-    };
-    if (
-      originalExpiredCallback &&
-      typeof globalWindow[originalExpiredCallback] === "function"
-    ) {
-      // Run our handle Captcha expired function first, then call the original expired callback
-      const originalExpired = globalWindow[
-        originalExpiredCallback
-      ] as () => void;
-      globalWindow[originalExpiredCallback] = () => {
-        this.lockButtons();
-        originalExpired();
-      };
-    } else {
-      this.log(
-        `g-recaptcha data-expired-callback "${originalExpiredCallback}" is missing or not a global function. Buttons will not re-lock on token expiry.`,
-        "⚠️"
-      );
-    }
+    }, Math.max(0, captchaDeadline - Date.now()));
   }
 
   private resolveAppealCode(): string {

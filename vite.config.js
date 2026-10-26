@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import cssInjectedByJsPlugin from "vite-plugin-css-injected-by-js";
 import browserslistToEsbuild from "browserslist-to-esbuild";
 import banner from "vite-plugin-banner";
+import fs from "fs";
 
 export default defineConfig({
   plugins: [
@@ -11,7 +12,7 @@ export default defineConfig({
     banner({
       content: `
 /*!
- * 
+ *
  *  ////////////////////////////////////////////////////
  *  //                                                //
  *  //                                                //
@@ -37,9 +38,9 @@ export default defineConfig({
    month: "2-digit",
    day: "2-digit",
  })} ${new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })}        //
+   hour: "2-digit",
+   minute: "2-digit",
+ })}        //
  *  //                                                //
  *  //            Created by 4Site Studios            //
  *  //     www.4sitestudios.com/engaging-networks     //
@@ -69,6 +70,12 @@ export default defineConfig({
         // for externalized deps
         globals: {},
       },
+    },
+  },
+  server: {
+    https: {
+      key: fs.readFileSync("./localhost-key.pem.local"),
+      cert: fs.readFileSync("./localhost-cert.pem.local"),
     },
   },
 });

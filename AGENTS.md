@@ -78,7 +78,7 @@ With `digital-wallets="true"` and a wallet payment method detected, the componen
 
 ### CAPTCHA
 
-If the page has a reCAPTCHA (`.g-recaptcha`), the banner must include a `.regive-captcha-container` (custom themes need to add one — otherwise Regive exits). The `.en__captcha` element is teleported into the banner, `data-callback` is wrapped to unlock the amount buttons on success, and `data-expired-callback` re-locks them. A 5-second soft timeout treats a never-appearing captcha as optional and unlocks the buttons.
+If the page has a reCAPTCHA (`.g-recaptcha`), the banner must include a `.regive-captcha-container` (custom themes need to add one — otherwise Regive exits). The `.en__captcha` element is teleported into the banner, `data-callback` is wrapped to unlock the amount buttons on success, and `data-expired-callback` re-locks them. The captcha wrapper and its callbacks share a single 5-second readiness window, so their waits are not additive. While waiting for callbacks the buttons stay locked; if the callback is still unavailable at the shared deadline, Regive exits. If no required captcha wrapper appears by that deadline, the soft-timeout path treats the captcha as optional and unlocks the buttons.
 
 ### Fail-Closed Contract
 

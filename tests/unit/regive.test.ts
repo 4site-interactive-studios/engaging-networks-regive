@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Regive } from "../../src/lib/regive";
 import { RegiveOptions } from "../../src/lib/regive-options";
 
@@ -10,6 +10,11 @@ type RegiveInternals = {
   formatAskAmount(amount: string | undefined): string;
   processAmounts(options: RegiveOptions): void;
   getTheme(options: RegiveOptions): string;
+  overrideCaptchaCallbacks(
+    captcha: HTMLElement,
+    captchaDeadline: number
+  ): void;
+  exit(): void;
 };
 
 // With no pageJson in the document the constructor exits immediately
@@ -308,5 +313,97 @@ describe("getTheme", () => {
       themeRules: "abc:broken,100:big",
     };
     expect(regive.getTheme(options)).toBe("big");
+  });
+});
+
+describe("overrideCaptchaCallbacks", () => {
+  const captchaWindow = window as typeof window & {
+    delayedCaptchaCallback?: (token: string) => void;
+  };
+  let captcha: HTMLElement;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `
+      <div class="en__captcha"><div class="g-recaptcha"></div></div>
+      <button class="regive-amount-btn" disabled></button>
+    `;
+    captcha = document.querySelector(".en__captcha") as HTMLElement;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    delete captchaWindow.delayedCaptchaCallback;
+  });
+
+  it("wraps a data-callback attribute that appears after initialization", async () => {
+    const original = vi.fn((_: string) => undefined);
+    captchaWindow.delayedCaptchaCallback = original;
+    const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+
+    regive.overrideCaptchaCallbacks(captcha, Date.now() + 5000);
+
+    expect(exit).not.toHaveBeenCalled();
+    document
+      .querySelector(".g-recaptcha")
+      ?.setAttribute("data-callback", "delayedCaptchaCallback");
+    await vi.advanceTimersByTimeAsync(0);
+
+    const wrapped = captchaWindow.delayedCaptchaCallback;
+    expect(wrapped).toEqual(expect.any(Function));
+    expect(wrapped).not.toBe(original);
+    wrapped?.("token");
+    expect(original).toHaveBeenCalledWith("token");
+    expect(
+      (document.querySelector(".regive-amount-btn") as HTMLButtonElement)
+        .disabled
+    ).toBe(false);
+  });
+
+  it("waits for the named global callback function to appear", async () => {
+    const original = vi.fn((_: string) => undefined);
+    const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+    document
+      .querySelector(".g-recaptcha")
+      ?.setAttribute("data-callback", "delayedCaptchaCallback");
+
+    regive.overrideCaptchaCallbacks(captcha, Date.now() + 5000);
+
+    expect(exit).not.toHaveBeenCalled();
+    captchaWindow.delayedCaptchaCallback = original;
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(captchaWindow.delayedCaptchaCallback).not.toBe(original);
+    captchaWindow.delayedCaptchaCallback?.("token");
+    expect(original).toHaveBeenCalledWith("token");
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("exits after five seconds if the callback never becomes usable", async () => {
+    const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+
+    regive.overrideCaptchaCallbacks(captcha, Date.now() + 5000);
+
+    expect(exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses only the remaining time from the shared CAPTCHA deadline", async () => {
+    const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+    const captchaDeadline = Date.now() + 5000;
+
+    // Simulate the captcha wrapper taking three seconds to appear.
+    await vi.advanceTimersByTimeAsync(3000);
+    regive.overrideCaptchaCallbacks(captcha, captchaDeadline);
+
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(exit).toHaveBeenCalledTimes(1);
   });
 });
