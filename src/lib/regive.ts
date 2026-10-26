@@ -297,6 +297,10 @@ export class Regive {
   }
 
   private addCustomBanner(paymentMethod: string) {
+    if (!this.setPaymentMethod(paymentMethod)) {
+      this.exit();
+      return;
+    }
     if (this.options?.test) {
       this.log("Adding a custom banner to the page IN TEST MODE", "⚠️");
     } else {
@@ -624,7 +628,7 @@ export class Regive {
           ".regive-amounts"
         ) as HTMLElement;
         if (amountsWrapper) {
-          amountsWrapper.style.display = "none";
+          amountsWrapper.style.setProperty("display", "none", "important");
         }
       } else {
         this.log(
@@ -646,6 +650,13 @@ export class Regive {
       // then move it into the banner and attach submit listeners
       this.waitForDigitalWalletUI(
         (digitalWalletsWrapper) => {
+          // ENgrid falls back to Card while the Stripe UI is still loading.
+          // Restore the original wallet method once its UI is ready, before
+          // moving the wrapper or attaching submission listeners.
+          if (!this.setPaymentMethod(paymentMethod)) {
+            this.exit();
+            return;
+          }
           regiveWalletsWrapper.insertAdjacentElement(
             "afterbegin",
             digitalWalletsWrapper
@@ -854,6 +865,102 @@ export class Regive {
     return "REGIVE";
   }
 
+  // Synchronize the child form with the original payment method before any
+  // banner or digital wallet setup. Existing choice fields must explicitly
+  // support the required value; never guess a card brand or create a missing
+  // payment field. Change events fire only after both writes have verified so
+  // page listeners cannot initialize a wallet with partially updated state.
+  private setPaymentMethod(paymentMethod: string): boolean {
+    const lowerCaseMethod = paymentMethod.toLowerCase();
+    const normalizedPaymentMethod = ["applepay", "googlepay"].includes(
+      lowerCaseMethod
+    )
+      ? "stripedigitalwallet"
+      : lowerCaseMethod === "dafpay"
+        ? "daf"
+        : paymentMethod;
+    const isCard = cardMethods.some(
+      (method) => method.toLowerCase() === lowerCaseMethod
+    );
+    const paymentFields = [
+      {
+        name: "transaction.paymenttype",
+        value: normalizedPaymentMethod,
+      },
+      {
+        name: "transaction.giveBySelect",
+        value: isCard ? "card" : normalizedPaymentMethod,
+      },
+    ];
+
+    for (const paymentField of paymentFields) {
+      const fields = Array.from(
+        document.getElementsByName(paymentField.name)
+      ) as Array<HTMLInputElement | HTMLSelectElement>;
+      if (fields.length === 0) continue;
+
+      const availableValues = fields.flatMap((field) => {
+        if (field instanceof HTMLSelectElement) {
+          return Array.from(field.options).map((option) => option.value);
+        }
+        if (["radio", "checkbox"].includes(field.type)) {
+          return [field.value];
+        }
+        return [];
+      });
+      const matchingValue = availableValues.find(
+        (value) => value.toLowerCase() === paymentField.value.toLowerCase()
+      );
+
+      // Text and hidden inputs accept an arbitrary value. Selects, radios, and
+      // checkboxes must have a matching choice already present on the page.
+      if (availableValues.length > 0 && !matchingValue) {
+        this.log(
+          `Payment method mismatch for ${paymentField.name}: the form has no "${paymentField.value}" option. Exiting Regive.`,
+          "🔴",
+          {
+            paymentMethod,
+            requiredValue: paymentField.value,
+            availableValues,
+          }
+        );
+        return false;
+      }
+
+      const valueToApply = matchingValue ?? paymentField.value;
+      if (!this.applyFieldValue(paymentField.name, valueToApply)) {
+        this.log(
+          `Payment method mismatch for ${paymentField.name}: could not apply "${valueToApply}". Exiting Regive.`,
+          "🔴",
+          {
+            paymentMethod,
+            requiredValue: paymentField.value,
+            appliedValue: this.ENgrid.getFieldValue(paymentField.name),
+          }
+        );
+        return false;
+      }
+    }
+
+    paymentFields.forEach((paymentField) => {
+      const fields = document.getElementsByName(paymentField.name);
+      fields.forEach((field) => {
+        if (
+          field instanceof HTMLSelectElement ||
+          (field instanceof HTMLInputElement &&
+            ["radio", "checkbox"].includes(field.type) &&
+            field.checked)
+        ) {
+          field.dispatchEvent(
+            new Event("change", { bubbles: true, cancelable: true })
+          );
+        }
+      });
+    });
+
+    return true;
+  }
+
   private writeHiddenFields(paymentMethod: string) {
     const source = this.resolveAppealCode();
     const sourceField = this.ENgrid.getField(
@@ -880,27 +987,12 @@ export class Regive {
     if (feeCover && feeCover.checked) {
       feeCover.checked = false;
     }
-    const paymentTypeField = this.ENgrid.getField(
-      "transaction.paymenttype"
-    ) as HTMLInputElement;
-    if (paymentTypeField) {
-      paymentTypeField.value = paymentMethod;
-    }
-    const giveBySelect = document.querySelector(
-      `input[name='transaction.giveBySelect'][value='${paymentMethod}']`
-    ) as HTMLInputElement;
-    if (giveBySelect) {
-      this.log("Setting giveBySelect to match the payment method", "💾", {
-        paymentMethod,
-      });
-      giveBySelect.checked = true;
-    }
     if (cardMethods.includes(paymentMethod)) {
-      this.writeHiddenCardFields(paymentMethod, source);
+      this.writeHiddenCardFields(source);
     }
   }
 
-  private writeHiddenCardFields(paymentMethod: string, source: string) {
+  private writeHiddenCardFields(source: string) {
     const tokens = this.getVgsTokens();
     const expField = this.ENgrid.getField(
       "transaction.ccexpire"
@@ -967,8 +1059,6 @@ export class Regive {
         tokens.card || ""
       );
     }
-    this.ENgrid.setPaymentType(paymentMethod);
-
     this.log("Writing hidden fields to the form", "💾", {
       source,
       tokens,

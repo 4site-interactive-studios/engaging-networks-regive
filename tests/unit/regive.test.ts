@@ -5,11 +5,19 @@ import { RegiveOptions } from "../../src/lib/regive-options";
 // The DAS methods under test are private. Bracket access via a structural
 // type lets us exercise them without changing the public surface of Regive.
 type RegiveInternals = {
+  options: RegiveOptions | undefined;
   parseAmount(value: string | null | undefined): number;
   isRegiveAmountAllowed(amount: string | number): boolean;
   formatAskAmount(amount: string | undefined): string;
   processAmounts(options: RegiveOptions): void;
   getTheme(options: RegiveOptions): string;
+  setPaymentMethod(paymentMethod: string): boolean;
+  addCustomBanner(paymentMethod: string): void;
+  waitForDigitalWalletUI(
+    onReady: (wrapper: HTMLElement) => void,
+    onTimeout?: () => void
+  ): void;
+  log(message: string, emoji?: string, data?: unknown): void;
   overrideCaptchaCallbacks(
     captcha: HTMLElement,
     captchaDeadline: number
@@ -313,6 +321,231 @@ describe("getTheme", () => {
       themeRules: "abc:broken,100:big",
     };
     expect(regive.getTheme(options)).toBe("big");
+  });
+});
+
+describe("setPaymentMethod", () => {
+  beforeEach(() => {
+    regive.options = { amount: "5", digitalWallets: true };
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+      }
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const renderForm = (paymentFields: string) => {
+    document.body.innerHTML = `
+      <form class="en__component">
+        ${paymentFields}
+        <input type="radio" name="transaction.donationAmt" value="5">
+      </form>
+    `;
+  };
+
+  it("preserves a card brand in paymenttype and selects Card in giveBySelect", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="">Select payment type</option>
+        <option value="VI">Visa</option>
+        <option value="MC">Mastercard</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+      <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+    `);
+
+    expect(regive.setPaymentMethod("VI")).toBe(true);
+    expect(
+      (document.querySelector('[name="transaction.paymenttype"]') as HTMLSelectElement)
+        .value
+    ).toBe("VI");
+    expect(
+      (document.querySelector('[name="transaction.giveBySelect"]:checked') as HTMLInputElement)
+        .value
+    ).toBe("Card");
+  });
+
+  it("normalizes wallet aliases and dispatches changes only after both writes", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="">Select payment type</option>
+        <option value="stripedigitalwallet">Apple Pay / Google Pay</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+      <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+    `);
+    const select = document.querySelector(
+      '[name="transaction.paymenttype"]'
+    ) as HTMLSelectElement;
+    const walletRadio = document.querySelector(
+      '[name="transaction.giveBySelect"][value="stripedigitalwallet"]'
+    ) as HTMLInputElement;
+    const changeSnapshots: Array<[string, string, boolean]> = [];
+    const recordChange = (field: string) => {
+      changeSnapshots.push([field, select.value, walletRadio.checked]);
+    };
+    select.addEventListener("change", () => recordChange("paymenttype"));
+    walletRadio.addEventListener("change", () => recordChange("giveBySelect"));
+
+    expect(regive.setPaymentMethod("applepay")).toBe(true);
+    expect(select.value).toBe("stripedigitalwallet");
+    expect(walletRadio.checked).toBe(true);
+    expect(changeSnapshots).toEqual([
+      ["paymenttype", "stripedigitalwallet", true],
+      ["giveBySelect", "stripedigitalwallet", true],
+    ]);
+  });
+
+  it("ignores payment fields that are not present", () => {
+    renderForm("");
+
+    expect(regive.setPaymentMethod("card")).toBe(true);
+    expect(document.querySelector('[name="transaction.paymenttype"]')).toBeNull();
+    expect(document.querySelector('[name="transaction.giveBySelect"]')).toBeNull();
+  });
+
+  it("rejects a missing select option without dispatching changes", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="">Select payment type</option>
+        <option value="VI">Visa</option>
+      </select>
+    `);
+    const select = document.querySelector(
+      '[name="transaction.paymenttype"]'
+    ) as HTMLSelectElement;
+    const change = vi.fn();
+    const log = vi.spyOn(regive, "log");
+    select.addEventListener("change", change);
+
+    expect(regive.setPaymentMethod("stripedigitalwallet")).toBe(false);
+    expect(select.value).toBe("");
+    expect(change).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("transaction.paymenttype"),
+      "🔴",
+      expect.objectContaining({ requiredValue: "stripedigitalwallet" })
+    );
+  });
+
+  it("does not guess a card brand for a generic card payment", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="">Select payment type</option>
+        <option value="VI">Visa</option>
+        <option value="MC">Mastercard</option>
+      </select>
+    `);
+
+    expect(regive.setPaymentMethod("card")).toBe(false);
+    expect(
+      (document.querySelector('[name="transaction.paymenttype"]') as HTMLSelectElement)
+        .value
+    ).toBe("");
+  });
+
+  it("exits before banner or wallet setup when giveBySelect has no match", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="">Select payment type</option>
+        <option value="stripedigitalwallet">Apple Pay / Google Pay</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+    `);
+    const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+    const waitForWallet = vi
+      .spyOn(regive, "waitForDigitalWalletUI")
+      .mockImplementation(() => {});
+
+    regive.addCustomBanner("stripedigitalwallet");
+
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(waitForWallet).not.toHaveBeenCalled();
+    expect(document.querySelector(".regive-embed")).toBeNull();
+  });
+
+  it("sets both payment fields before digital wallet initialization", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="">Select payment type</option>
+        <option value="stripedigitalwallet">Apple Pay / Google Pay</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+      <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+    `);
+    const select = document.querySelector(
+      '[name="transaction.paymenttype"]'
+    ) as HTMLSelectElement;
+    const walletRadio = document.querySelector(
+      '[name="transaction.giveBySelect"][value="stripedigitalwallet"]'
+    ) as HTMLInputElement;
+    const waitForWallet = vi
+      .spyOn(regive, "waitForDigitalWalletUI")
+      .mockImplementation(() => {
+        expect(select.value).toBe("stripedigitalwallet");
+        expect(walletRadio.checked).toBe(true);
+      });
+
+    regive.addCustomBanner("googlepay");
+
+    expect(waitForWallet).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes the single wallet amount hide important so themes cannot override it", () => {
+    renderForm("");
+    vi.spyOn(regive, "waitForDigitalWalletUI").mockImplementation(() => {});
+
+    regive.addCustomBanner("stripedigitalwallet");
+
+    const amountsWrapper = document.querySelector(
+      ".regive-amounts"
+    ) as HTMLElement;
+    expect(amountsWrapper.style.getPropertyValue("display")).toBe("none");
+    expect(amountsWrapper.style.getPropertyPriority("display")).toBe(
+      "important"
+    );
+  });
+
+  it("restores the wallet payment method after ENgrid falls back to a card", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="VI" selected>Visa</option>
+        <option value="stripedigitalwallet">Apple Pay / Google Pay</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+      <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+      <div id="en__digitalWallet"><iframe></iframe></div>
+    `);
+    const select = document.querySelector(
+      '[name="transaction.paymenttype"]'
+    ) as HTMLSelectElement;
+    const cardRadio = document.querySelector(
+      '[name="transaction.giveBySelect"][value="Card"]'
+    ) as HTMLInputElement;
+    const walletRadio = document.querySelector(
+      '[name="transaction.giveBySelect"][value="stripedigitalwallet"]'
+    ) as HTMLInputElement;
+    const walletWrapper = document.getElementById(
+      "en__digitalWallet"
+    ) as HTMLElement;
+    vi.spyOn(regive, "waitForDigitalWalletUI").mockImplementation((onReady) => {
+      // ENgrid's DigitalWallets loading fallback selects Card when the Stripe
+      // UI is not populated yet; this select resolves that fallback to VI.
+      select.value = "VI";
+      cardRadio.checked = true;
+      onReady(walletWrapper);
+    });
+
+    regive.addCustomBanner("stripedigitalwallet");
+
+    expect(select.value).toBe("stripedigitalwallet");
+    expect(walletRadio.checked).toBe(true);
   });
 });
 
