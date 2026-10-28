@@ -146,24 +146,44 @@ export class Regive {
           ? this.options?.testMethod
           : this.detectPaymentMethod();
       this.log("Detected payment method", "💳", paymentMethod);
+      const digitalWalletsEnabled = !!(
+        this.options?.digitalWallets &&
+        digitalWalletMethods.includes(paymentMethod)
+      );
       if (
-        ((digitalWalletMethods.includes(paymentMethod) &&
-          this.options?.digitalWallets) ||
-          cardMethods.includes(paymentMethod)) &&
+        (digitalWalletsEnabled || cardMethods.includes(paymentMethod)) &&
         this.hasRequiredFields() &&
         this.isChained
       ) {
-        this.log(
-          "Conditions met to hide the donation form and add a banner",
-          "🟢"
-        );
-        this.ENgrid.setBodyData("embedded", "true");
-        this.hideAll();
-        this.addCustomBanner(paymentMethod);
-        if (this.isExited) return;
-        this.writeHiddenFields(paymentMethod);
-        if (this.isExited) return;
-        this.sendMessageToParent("loaded");
+        const initializeBanner = () => {
+          this.log(
+            "Conditions met to hide the donation form and add a banner",
+            "🟢"
+          );
+          this.ENgrid.setBodyData("embedded", "true");
+          this.hideAll();
+          this.addCustomBanner(paymentMethod);
+          if (this.isExited) return;
+          this.writeHiddenFields(paymentMethod);
+          if (this.isExited) return;
+          this.sendMessageToParent("loaded");
+        };
+        if (digitalWalletsEnabled) {
+          // Let the selected wallet render in the original, visible form
+          // before hiding anything or relocating its wrapper. addCustomBanner
+          // restores payment state and enables Regive without a second timeout.
+          if (!this.setPaymentMethod(paymentMethod)) {
+            this.exit();
+            return;
+          }
+          this.waitForDigitalWalletUI(
+            initializeBanner,
+            () => this.exit(),
+            paymentMethod
+          );
+        } else {
+          initializeBanner();
+        }
       } else {
         this.log("Conditions not met to modify the embedded page", "⚠️");
         this.exit();
@@ -400,10 +420,11 @@ export class Regive {
         filter: grayscale(70%);
         cursor: not-allowed;
       }
-      .interaction-lock {
+      .regive-wallets-wrapper.interaction-lock {
         pointer-events: none;
         cursor: not-allowed;
         opacity: 0.5;
+        filter: grayscale(70%);
       }
       ${
         digitalWalletsEnabled
@@ -460,7 +481,7 @@ export class Regive {
               })
               .join("")}
           </div>
-          ${digitalWalletsEnabled ? '<div class="regive-wallets-wrapper"></div>' : ""}
+          ${digitalWalletsEnabled ? `<div class="regive-wallets-wrapper ${hasCaptcha ? "interaction-lock" : ""}"></div>` : ""}
           `
         );
       template = template.replace(
@@ -646,26 +667,37 @@ export class Regive {
       const regiveWalletsWrapper = banner.querySelector(
         ".regive-wallets-wrapper"
       ) as HTMLElement;
-      // Wait for the digital wallets form block (and the wallet UI inside it),
-      // then move it into the banner and attach submit listeners
-      this.waitForDigitalWalletUI(
-        (digitalWalletsWrapper) => {
-          // ENgrid falls back to Card while the Stripe UI is still loading.
-          // Restore the original wallet method once its UI is ready, before
-          // moving the wrapper or attaching submission listeners.
-          if (!this.setPaymentMethod(paymentMethod)) {
-            this.exit();
-            return;
-          }
-          regiveWalletsWrapper.insertAdjacentElement(
-            "afterbegin",
-            digitalWalletsWrapper
-          );
-          this.addDigitalWalletSubmitListeners(paymentMethod);
-          this.sendMessageToParent("enabled");
-        },
-        () => this.exit()
-      );
+      // The selected wallet already rendered before handleFirstPage hid the
+      // form. Relocate it, then check again after the move before enabling;
+      // another wallet's iframe must not mark the selected method as ready.
+      const digitalWalletsWrapper = document.querySelector(
+        "#en__digitalWallet"
+      ) as HTMLElement | null;
+      if (digitalWalletsWrapper) {
+        regiveWalletsWrapper.insertAdjacentElement(
+          "afterbegin",
+          digitalWalletsWrapper
+        );
+      }
+      // Reapply the selection now that the wallet block is visible. If a
+      // gateway could not mount inside the hidden form, this gives its change
+      // handlers a chance to initialize before the readiness wait begins.
+      if (!this.setPaymentMethod(paymentMethod)) {
+        this.exit();
+        return;
+      }
+      this.setDigitalWalletVisibility(paymentMethod);
+      // Readiness was established before the form was hidden. Do not start a
+      // second timeout after relocation: the wallet already rendered, and a
+      // later observer must not reject it. Restore payment state and visibility
+      // after the move, then attach listeners and enable Regive.
+      if (!this.setPaymentMethod(paymentMethod)) {
+        this.exit();
+        return;
+      }
+      this.setDigitalWalletVisibility(paymentMethod);
+      this.addDigitalWalletSubmitListeners(paymentMethod);
+      this.sendMessageToParent("enabled");
     } else {
       this.sendMessageToParent("enabled");
     }
@@ -870,6 +902,8 @@ export class Regive {
   // support the required value; never guess a card brand or create a missing
   // payment field. Change events fire only after both writes have verified so
   // page listeners cannot initialize a wallet with partially updated state.
+  // Notify giveBySelect first, then restore the exact payment type and verify
+  // both fields again after change handlers have run.
   private setPaymentMethod(paymentMethod: string): boolean {
     const lowerCaseMethod = paymentMethod.toLowerCase();
     const normalizedPaymentMethod = ["applepay", "googlepay"].includes(
@@ -884,14 +918,15 @@ export class Regive {
     );
     const paymentFields = [
       {
-        name: "transaction.paymenttype",
-        value: normalizedPaymentMethod,
-      },
-      {
         name: "transaction.giveBySelect",
         value: isCard ? "card" : normalizedPaymentMethod,
       },
+      {
+        name: "transaction.paymenttype",
+        value: normalizedPaymentMethod,
+      },
     ];
+    const appliedFields: { name: string; value: string }[] = [];
 
     for (const paymentField of paymentFields) {
       const fields = Array.from(
@@ -908,8 +943,13 @@ export class Regive {
         }
         return [];
       });
-      const matchingValue = availableValues.find(
-        (value) => value.toLowerCase() === paymentField.value.toLowerCase()
+      const requiredValue = paymentField.value.toLowerCase();
+      const acceptedValues =
+        requiredValue === "stripedigitalwallet"
+          ? ["stripedigitalwallet", "digitalwallet"]
+          : [requiredValue];
+      const matchingValue = availableValues.find((value) =>
+        acceptedValues.includes(value.toLowerCase())
       );
 
       // Text and hidden inputs accept an arbitrary value. Selects, radios, and
@@ -940,9 +980,24 @@ export class Regive {
         );
         return false;
       }
+      appliedFields.push({ name: paymentField.name, value: valueToApply });
     }
 
-    paymentFields.forEach((paymentField) => {
+    for (const paymentField of appliedFields) {
+      // ENgrid's give-by-select handler maps generic Card to Visa. Restore
+      // the captured brand before notifying paymenttype listeners.
+      if (!this.applyFieldValue(paymentField.name, paymentField.value)) {
+        this.log(
+          `Payment method mismatch for ${paymentField.name}: could not restore "${paymentField.value}" after change handlers. Exiting Regive.`,
+          "🔴",
+          {
+            paymentMethod,
+            requiredValue: paymentField.value,
+            appliedValue: this.ENgrid.getFieldValue(paymentField.name),
+          }
+        );
+        return false;
+      }
       const fields = document.getElementsByName(paymentField.name);
       fields.forEach((field) => {
         if (
@@ -956,9 +1011,68 @@ export class Regive {
           );
         }
       });
-    });
+    }
+
+    // Read only: another write here would conceal a conflicting page handler
+    // instead of verifying the final state that will be submitted.
+    for (const paymentField of appliedFields) {
+      const appliedValue = this.ENgrid.getFieldValue(paymentField.name);
+      if (
+        !appliedValue.split(",").every((value) => value === paymentField.value)
+      ) {
+        this.log(
+          `Payment method mismatch for ${paymentField.name} after change handlers: expected "${paymentField.value}". Exiting Regive.`,
+          "🔴",
+          { paymentMethod, requiredValue: paymentField.value, appliedValue }
+        );
+        return false;
+      }
+    }
 
     return true;
+  }
+
+  // EN only hides the inner wallet containers, leaving every outer button
+  // wrapper visible. Enforce one visible outer wrapper for the detected method
+  // after ENgrid's change handlers have run as well as when the block is moved.
+  private setDigitalWalletVisibility(paymentMethod: string): void {
+    const lowerCaseMethod = paymentMethod.toLowerCase();
+    const normalizedPaymentMethod = ["applepay", "googlepay"].includes(
+      lowerCaseMethod
+    )
+      ? "stripedigitalwallet"
+      : lowerCaseMethod === "dafpay"
+        ? "daf"
+        : lowerCaseMethod;
+    const walletButtons = [
+      {
+        id: "en__digitalWallet__stripeButtons",
+        methods: ["stripedigitalwallet"],
+      },
+      {
+        id: "en__digitalWallet__paypalTouch",
+        methods: [
+          "paypaltouch",
+          "paypal-onetouch",
+          "paypal-one-touch",
+          "paypalonetouch",
+        ],
+      },
+      {
+        id: "en__digitalWallet__chariot",
+        methods: ["daf"],
+      },
+    ];
+
+    walletButtons.forEach(({ id, methods }) => {
+      const button = document.getElementById(id);
+      if (!button) return;
+      button.style.setProperty(
+        "display",
+        methods.includes(normalizedPaymentMethod) ? "inline-block" : "none",
+        "important"
+      );
+    });
   }
 
   private writeHiddenFields(paymentMethod: string) {
@@ -2086,19 +2200,49 @@ export class Regive {
   /**
    * Waits for the digital wallets UI to be present in the page.
    * Locates the #en__digitalWallet element (waiting up to 5 seconds for it
-   * to appear if it is not in the DOM yet), then waits up to 5 seconds for the
-   * wallet UI (an iframe or the DAF chariot button) to render inside it.
+   * to appear if it is not in the DOM yet), then waits up to 10 seconds for
+   * the selected wallet UI to render. Without a payment method, any wallet
+   * iframe or the DAF chariot button satisfies the first-page watch.
    * @param onReady {(wrapper: HTMLElement) => void} Called with the wallets wrapper once the wallet UI is present.
-   * @param onTimeout {() => void} Optional callback fired if either wait exceeds 5 seconds.
+   * @param onTimeout {() => void} Optional callback fired on timeout.
+   * @param paymentMethod {string | null} Detected wallet method to wait for.
    * @returns {void}
    */
   private waitForDigitalWalletUI(
     onReady: (wrapper: HTMLElement) => void,
-    onTimeout?: () => void
+    onTimeout?: () => void,
+    paymentMethod: string | null = null
   ): void {
-    const hasWalletUI = (wrapper: HTMLElement) =>
-      !!wrapper.querySelector("iframe") ||
-      !!wrapper.querySelector("#chariot-button");
+    const hasWalletUI = (wrapper: HTMLElement) => {
+      if (paymentMethod === null) {
+        return (
+          !!wrapper.querySelector("iframe") ||
+          !!wrapper.querySelector("#chariot-button")
+        );
+      }
+      const lowerCaseMethod = paymentMethod.toLowerCase();
+      const normalizedPaymentMethod = ["applepay", "googlepay"].includes(
+        lowerCaseMethod
+      )
+        ? "stripedigitalwallet"
+        : lowerCaseMethod === "dafpay"
+          ? "daf"
+          : lowerCaseMethod;
+      const walletContainers: Record<string, string> = {
+        stripedigitalwallet: "#en__digitalWallet__stripeButtons__container",
+        paypaltouch: "#en__digitalWallet__paypalTouch__container",
+        "paypal-onetouch": "#en__digitalWallet__paypalTouch__container",
+        "paypal-one-touch": "#en__digitalWallet__paypalTouch__container",
+        paypalonetouch: "#en__digitalWallet__paypalTouch__container",
+        daf: "#en__digitalWallet__chariot__container",
+      };
+      const selector = walletContainers[normalizedPaymentMethod];
+      if (!selector) return false;
+      if (normalizedPaymentMethod === "daf") {
+        return !!wrapper.querySelector(`${selector} #chariot-button`);
+      }
+      return !!wrapper.querySelector(`${selector} iframe`);
+    };
 
     const waitForUI = (wrapper: HTMLElement) => {
       if (hasWalletUI(wrapper)) {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ENGrid } from "../../src/lib/engrid";
 import { Regive } from "../../src/lib/regive";
 import { RegiveOptions } from "../../src/lib/regive-options";
 
@@ -6,16 +7,30 @@ import { RegiveOptions } from "../../src/lib/regive-options";
 // type lets us exercise them without changing the public surface of Regive.
 type RegiveInternals = {
   options: RegiveOptions | undefined;
+  isEmbedded: boolean;
+  isChained: boolean;
+  isExited: boolean;
   parseAmount(value: string | null | undefined): number;
   isRegiveAmountAllowed(amount: string | number): boolean;
   formatAskAmount(amount: string | undefined): string;
   processAmounts(options: RegiveOptions): void;
   getTheme(options: RegiveOptions): string;
   setPaymentMethod(paymentMethod: string): boolean;
+  setDigitalWalletVisibility(paymentMethod: string): void;
+  handleFirstPage(): void;
+  loadOptionsFromUrl(): void;
+  hideAll(): void;
   addCustomBanner(paymentMethod: string): void;
+  writeHiddenFields(paymentMethod: string): void;
+  sendMessageToParent(action: string, value?: unknown): void;
   waitForDigitalWalletUI(
     onReady: (wrapper: HTMLElement) => void,
-    onTimeout?: () => void
+    onTimeout?: () => void,
+    paymentMethod?: string | null
+  ): void;
+  addDigitalWalletSubmitListeners(
+    paymentMethod: string | null,
+    callback?: (method: string) => void
   ): void;
   log(message: string, emoji?: string, data?: unknown): void;
   overrideCaptchaCallbacks(
@@ -324,6 +339,119 @@ describe("getTheme", () => {
   });
 });
 
+describe("handleFirstPage digital wallets", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("waits for the selected wallet UI before hiding the form and building the banner", () => {
+    document.body.innerHTML = `<form class="en__component"></form>`;
+    Object.assign(regive, {
+      isEmbedded: true,
+      isChained: true,
+      isExited: false,
+      options: {
+        amount: "5",
+        digitalWallets: true,
+        test: true,
+        testMethod: "stripedigitalwallet",
+      },
+    });
+    const events: string[] = [];
+    vi.spyOn(regive, "loadOptionsFromUrl").mockImplementation(() => {});
+    vi.spyOn(regive, "setPaymentMethod").mockImplementation(() => {
+      events.push("payment");
+      return true;
+    });
+    vi.spyOn(regive, "hideAll").mockImplementation(() => {
+      events.push("hide");
+    });
+    vi.spyOn(regive, "addCustomBanner").mockImplementation(() => {
+      events.push("banner");
+    });
+    vi.spyOn(regive, "writeHiddenFields").mockImplementation(() => {
+      events.push("fields");
+    });
+    vi.spyOn(regive, "sendMessageToParent").mockImplementation(() => {});
+    let walletReady: ((wrapper: HTMLElement) => void) | undefined;
+    const waitForWallet = vi
+      .spyOn(regive, "waitForDigitalWalletUI")
+      .mockImplementation((onReady) => {
+        events.push("wait");
+        walletReady = onReady;
+      });
+
+    regive.handleFirstPage();
+
+    expect(events).toEqual(["payment", "wait"]);
+    expect(waitForWallet.mock.calls[0][2]).toBe("stripedigitalwallet");
+    expect(regive.addCustomBanner).not.toHaveBeenCalled();
+    expect(regive.hideAll).not.toHaveBeenCalled();
+
+    walletReady?.(document.createElement("div"));
+
+    expect(events).toEqual(["payment", "wait", "hide", "banner", "fields"]);
+  });
+
+  it("does not start a second wallet timeout after the selected button was ready", () => {
+    document.body.innerHTML = `
+      <form class="en__component">
+        <select name="transaction.paymenttype">
+          <option value="VI">Visa</option>
+          <option value="stripedigitalwallet">Apple Pay / Google Pay</option>
+        </select>
+        <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+        <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+        <input type="radio" name="transaction.donationAmt" value="5">
+        <div id="en__digitalWallet">
+          <div id="en__digitalWallet__stripeButtons">
+            <div id="en__digitalWallet__stripeButtons__container"><iframe></iframe></div>
+          </div>
+        </div>
+      </form>
+    `;
+    Object.assign(regive, {
+      isEmbedded: true,
+      isChained: true,
+      isExited: false,
+      options: {
+        amount: "5",
+        digitalWallets: true,
+        test: true,
+        testMethod: "stripedigitalwallet",
+      },
+    });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+      }
+    );
+    vi.spyOn(regive, "loadOptionsFromUrl").mockImplementation(() => {});
+    vi.spyOn(regive, "writeHiddenFields").mockImplementation(() => {});
+    const sendMessage = vi
+      .spyOn(regive, "sendMessageToParent")
+      .mockImplementation(() => {});
+    const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+    const wallet = document.getElementById("en__digitalWallet") as HTMLElement;
+    let waitCalls = 0;
+    const waitForWallet = vi
+      .spyOn(regive, "waitForDigitalWalletUI")
+      .mockImplementation((onReady, onTimeout) => {
+        waitCalls++;
+        if (waitCalls === 1) onReady(wallet);
+        else onTimeout?.();
+      });
+
+    regive.handleFirstPage();
+
+    expect(waitForWallet).toHaveBeenCalledTimes(1);
+    expect(exit).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith("enabled");
+  });
+});
+
 describe("setPaymentMethod", () => {
   beforeEach(() => {
     regive.options = { amount: "5", digitalWallets: true };
@@ -397,9 +525,131 @@ describe("setPaymentMethod", () => {
     expect(select.value).toBe("stripedigitalwallet");
     expect(walletRadio.checked).toBe(true);
     expect(changeSnapshots).toEqual([
-      ["paymenttype", "stripedigitalwallet", true],
       ["giveBySelect", "stripedigitalwallet", true],
+      ["paymenttype", "stripedigitalwallet", true],
     ]);
+  });
+
+  it("accepts digitalwallet as the payment type for Stripe wallets", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="VI">Visa</option>
+        <option value="digitalwallet">Apple Pay / Google Pay</option>
+        <option value="paypal">PayPal</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+      <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+    `);
+    const walletRadio = document.querySelector<HTMLInputElement>(
+      '[name="transaction.giveBySelect"][value="stripedigitalwallet"]'
+    )!;
+    // ENgrid does not know this page's digitalwallet alias. Regive must
+    // restore the matched form value after the selector's change handler.
+    walletRadio.addEventListener("change", () => {
+      ENGrid.setPaymentType(walletRadio.value);
+    });
+
+    expect(regive.setPaymentMethod("stripedigitalwallet")).toBe(true);
+    expect(ENGrid.getPaymentType()).toBe("digitalwallet");
+    expect(ENGrid.getFieldValue("transaction.giveBySelect")).toBe(
+      "stripedigitalwallet"
+    );
+  });
+
+  it.each(["MC", "AX"])(
+    "preserves %s after ENgrid's Card change handler runs",
+    (paymentMethod) => {
+      renderForm(`
+        <select name="transaction.paymenttype">
+          <option value="VI">Visa</option>
+          <option value="MC">Mastercard</option>
+          <option value="AX">American Express</option>
+        </select>
+        <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+        <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+      `);
+      const cardRadio = document.querySelector<HTMLInputElement>(
+        '[name="transaction.giveBySelect"][value="Card"]'
+      )!;
+      const select = document.querySelector<HTMLSelectElement>(
+        '[name="transaction.paymenttype"]'
+      )!;
+      const notifiedPaymentTypes: string[] = [];
+      select.addEventListener("change", () => {
+        notifiedPaymentTypes.push(select.value);
+      });
+      // ENgrid's GiveBySelect delegates changes to this helper, which maps
+      // generic Card to the first card/visa/vi option instead of the brand.
+      cardRadio.addEventListener("change", () => {
+        ENGrid.setPaymentType(cardRadio.value);
+      });
+
+      expect(regive.setPaymentMethod(paymentMethod)).toBe(true);
+
+      expect(notifiedPaymentTypes).toEqual(["VI", paymentMethod]);
+      expect(ENGrid.getPaymentType()).toBe(paymentMethod);
+      expect(ENGrid.getFieldValue("transaction.giveBySelect")).toBe("Card");
+    }
+  );
+
+  it.each(["transaction.paymenttype", "transaction.giveBySelect"])(
+    "exits if a change handler leaves %s mismatched",
+    (changedField) => {
+      renderForm(`
+        <select name="transaction.paymenttype">
+          <option value="VI">Visa</option>
+          <option value="MC">Mastercard</option>
+        </select>
+        <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+        <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+      `);
+      const select = document.querySelector<HTMLSelectElement>(
+        '[name="transaction.paymenttype"]'
+      )!;
+      select.addEventListener("change", () => {
+        ENGrid.setFieldValue(
+          changedField,
+          changedField === "transaction.paymenttype"
+            ? "VI"
+            : "stripedigitalwallet"
+        );
+      });
+      const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+      const log = vi.spyOn(regive, "log");
+
+      regive.addCustomBanner("MC");
+
+      expect(exit).toHaveBeenCalledTimes(1);
+      expect(document.querySelector(".regive-embed")).toBeNull();
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining(changedField),
+        "🔴",
+        expect.objectContaining({ paymentMethod: "MC" })
+      );
+    }
+  );
+
+  it("exits if the Card handler removes the captured brand option", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="VI">Visa</option>
+        <option value="MC">Mastercard</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+    `);
+    const cardRadio = document.querySelector<HTMLInputElement>(
+      '[name="transaction.giveBySelect"]'
+    )!;
+    cardRadio.addEventListener("change", () => {
+      document.querySelector('option[value="MC"]')?.remove();
+      ENGrid.setPaymentType(cardRadio.value);
+    });
+    const exit = vi.spyOn(regive, "exit").mockImplementation(() => {});
+
+    regive.addCustomBanner("MC");
+
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".regive-embed")).toBeNull();
   });
 
   it("ignores payment fields that are not present", () => {
@@ -485,8 +735,8 @@ describe("setPaymentMethod", () => {
     const walletRadio = document.querySelector(
       '[name="transaction.giveBySelect"][value="stripedigitalwallet"]'
     ) as HTMLInputElement;
-    const waitForWallet = vi
-      .spyOn(regive, "waitForDigitalWalletUI")
+    const addWalletListeners = vi
+      .spyOn(regive, "addDigitalWalletSubmitListeners")
       .mockImplementation(() => {
         expect(select.value).toBe("stripedigitalwallet");
         expect(walletRadio.checked).toBe(true);
@@ -494,7 +744,72 @@ describe("setPaymentMethod", () => {
 
     regive.addCustomBanner("googlepay");
 
-    expect(waitForWallet).toHaveBeenCalledTimes(1);
+    expect(addWalletListeners).toHaveBeenCalledTimes(1);
+    expect(addWalletListeners).toHaveBeenCalledWith("googlepay");
+  });
+
+  it("moves the wallet into the visible banner before attaching listeners", () => {
+    renderForm(`
+      <div id="en__digitalWallet">
+        <div id="en__digitalWallet__stripeButtons__container"></div>
+      </div>
+    `);
+    const walletWrapper = document.getElementById(
+      "en__digitalWallet"
+    ) as HTMLElement;
+    const addWalletListeners = vi
+      .spyOn(regive, "addDigitalWalletSubmitListeners")
+      .mockImplementation(() => {
+        expect(
+          document
+            .querySelector(".regive-wallets-wrapper")
+            ?.contains(walletWrapper)
+        ).toBe(true);
+      });
+
+    regive.addCustomBanner("stripedigitalwallet");
+
+    expect(addWalletListeners).toHaveBeenCalledTimes(1);
+    expect(addWalletListeners).toHaveBeenCalledWith("stripedigitalwallet");
+  });
+
+  it("reapplies the wallet selection after moving the empty block into view", () => {
+    renderForm(`
+      <select name="transaction.paymenttype">
+        <option value="VI">Visa</option>
+        <option value="stripedigitalwallet">Apple Pay / Google Pay</option>
+      </select>
+      <input type="radio" name="transaction.giveBySelect" value="Card" checked>
+      <input type="radio" name="transaction.giveBySelect" value="stripedigitalwallet">
+      <div id="en__digitalWallet">
+        <div id="en__digitalWallet__stripeButtons">
+          <div id="en__digitalWallet__stripeButtons__container"></div>
+        </div>
+      </div>
+    `);
+    const wallet = document.getElementById("en__digitalWallet") as HTMLElement;
+    const stripeContainer = document.getElementById(
+      "en__digitalWallet__stripeButtons__container"
+    ) as HTMLElement;
+    const walletRadio = document.querySelector<HTMLInputElement>(
+      '[name="transaction.giveBySelect"][value="stripedigitalwallet"]'
+    )!;
+    walletRadio.addEventListener("change", () => {
+      // Simulate a gateway that mounts only after the selected wallet block is
+      // visible in Regive's banner rather than inside the hidden form.
+      if (document.querySelector(".regive-wallets-wrapper")?.contains(wallet)) {
+        stripeContainer.innerHTML = "<iframe></iframe>";
+      }
+    });
+    const addWalletListeners = vi
+      .spyOn(regive, "addDigitalWalletSubmitListeners")
+      .mockImplementation(() => {
+        expect(stripeContainer.querySelector("iframe")).not.toBeNull();
+      });
+
+    regive.addCustomBanner("stripedigitalwallet");
+
+    expect(addWalletListeners).toHaveBeenCalledTimes(1);
   });
 
   it("makes the single wallet amount hide important so themes cannot override it", () => {
@@ -510,6 +825,83 @@ describe("setPaymentMethod", () => {
     expect(amountsWrapper.style.getPropertyPriority("display")).toBe(
       "important"
     );
+  });
+
+  it("forces only the selected outer wallet button to remain visible", () => {
+    renderForm(`
+      <div id="en__digitalWallet">
+        <div id="en__digitalWallet__stripeButtons" style="display: inline-block">
+          <div id="en__digitalWallet__stripeButtons__container"><iframe></iframe></div>
+        </div>
+        <div id="en__digitalWallet__paypalTouch" style="display: inline-block">
+          <div id="en__digitalWallet__paypalTouch__container"></div>
+        </div>
+        <div id="en__digitalWallet__chariot" style="display: inline-block">
+          <div id="en__digitalWallet__chariot__container"></div>
+        </div>
+      </div>
+    `);
+    vi.spyOn(regive, "waitForDigitalWalletUI").mockImplementation((onReady) => {
+      // ENgrid's visibility handlers can leave every outer wrapper visible.
+      ["stripeButtons", "paypalTouch", "chariot"].forEach((method) => {
+        document.getElementById(`en__digitalWallet__${method}`)!.style.display =
+          "inline-block";
+      });
+      onReady(document.getElementById("en__digitalWallet") as HTMLElement);
+    });
+
+    regive.addCustomBanner("applepay");
+
+    const expectedDisplays: Record<string, string> = {
+      stripeButtons: "inline-block",
+      paypalTouch: "none",
+      chariot: "none",
+    };
+    Object.entries(expectedDisplays).forEach(([method, display]) => {
+      const button = document.getElementById(
+        `en__digitalWallet__${method}`
+      ) as HTMLElement;
+      expect(button.style.getPropertyValue("display")).toBe(display);
+      expect(button.style.getPropertyPriority("display")).toBe("important");
+    });
+  });
+
+  it("locks and greys a custom theme's wallet wrapper until CAPTCHA unlocks", () => {
+    renderForm(`
+      <div class="en__captcha">
+        <div class="g-recaptcha" data-callback="captchaCallback"></div>
+      </div>
+    `);
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      `<template id="captcha-wallet-theme">
+        <div class="regive-captcha-container"></div>
+        {{button}}
+      </template>`
+    );
+    regive.options = {
+      amount: "5",
+      digitalWallets: true,
+      theme: "captcha-wallet-theme",
+    };
+    vi.stubGlobal("captchaCallback", vi.fn());
+    vi.spyOn(regive, "waitForDigitalWalletUI").mockImplementation(() => {});
+
+    regive.addCustomBanner("stripedigitalwallet");
+
+    const walletsWrapper = document.querySelector(
+      ".regive-wallets-wrapper"
+    ) as HTMLElement;
+    expect(walletsWrapper.classList.contains("interaction-lock")).toBe(true);
+    const bannerStyles = Array.from(
+      document.querySelectorAll(".regive-embed style")
+    )
+      .map((style) => style.textContent)
+      .join("\n");
+    expect(bannerStyles).toContain(
+      ".regive-wallets-wrapper.interaction-lock"
+    );
+    expect(bannerStyles).toContain("filter: grayscale(70%);");
   });
 
   it("restores the wallet payment method after ENgrid falls back to a card", () => {
@@ -539,6 +931,11 @@ describe("setPaymentMethod", () => {
       // UI is not populated yet; this select resolves that fallback to VI.
       select.value = "VI";
       cardRadio.checked = true;
+      expect(
+        document
+          .querySelector(".regive-wallets-wrapper")
+          ?.contains(walletWrapper)
+      ).toBe(true);
       onReady(walletWrapper);
     });
 
@@ -546,6 +943,112 @@ describe("setPaymentMethod", () => {
 
     expect(select.value).toBe("stripedigitalwallet");
     expect(walletRadio.checked).toBe(true);
+  });
+});
+
+describe("setDigitalWalletVisibility", () => {
+  const renderWalletButtons = () => {
+    document.body.innerHTML = `
+      <div id="en__digitalWallet">
+        <div id="en__digitalWallet__stripeButtons"></div>
+        <div id="en__digitalWallet__paypalTouch"></div>
+        <div id="en__digitalWallet__chariot"></div>
+      </div>
+    `;
+  };
+
+  it.each([
+    ["stripedigitalwallet", "stripeButtons"],
+    ["applepay", "stripeButtons"],
+    ["googlepay", "stripeButtons"],
+    ["paypaltouch", "paypalTouch"],
+    ["paypal-onetouch", "paypalTouch"],
+    ["daf", "chariot"],
+    ["dafpay", "chariot"],
+  ])("shows only %s", (paymentMethod, selectedButton) => {
+    renderWalletButtons();
+
+    regive.setDigitalWalletVisibility(paymentMethod);
+
+    ["stripeButtons", "paypalTouch", "chariot"].forEach((method) => {
+      const button = document.getElementById(
+        `en__digitalWallet__${method}`
+      ) as HTMLElement;
+      expect(button.style.getPropertyValue("display")).toBe(
+        method === selectedButton ? "inline-block" : "none"
+      );
+      expect(button.style.getPropertyPriority("display")).toBe("important");
+    });
+  });
+});
+
+describe("waitForDigitalWalletUI", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("waits for the Stripe iframe when another wallet renders first", async () => {
+    document.body.innerHTML = `
+      <div id="en__digitalWallet">
+        <div id="en__digitalWallet__stripeButtons__container"></div>
+        <div id="en__digitalWallet__paypalTouch__container"></div>
+        <div id="en__digitalWallet__chariot__container"></div>
+      </div>
+    `;
+    const onReady = vi.fn();
+    const onTimeout = vi.fn();
+
+    regive.waitForDigitalWalletUI(onReady, onTimeout, "applepay");
+
+    expect(onReady).not.toHaveBeenCalled();
+    document.querySelector(
+      "#en__digitalWallet__paypalTouch__container"
+    )!.innerHTML =
+      "<iframe></iframe><chariot-connect id='chariot-button'></chariot-connect>";
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onReady).not.toHaveBeenCalled();
+
+    document.querySelector(
+      "#en__digitalWallet__stripeButtons__container"
+    )!.innerHTML = "<div><iframe></iframe></div>";
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onTimeout).not.toHaveBeenCalled();
+  });
+
+  it("times out if only other wallets become ready", () => {
+    document.body.innerHTML = `
+      <div id="en__digitalWallet">
+        <div id="en__digitalWallet__stripeButtons__container"></div>
+        <div id="en__digitalWallet__paypalTouch__container"><iframe></iframe></div>
+      </div>
+    `;
+    const onReady = vi.fn();
+    const onTimeout = vi.fn();
+
+    regive.waitForDigitalWalletUI(onReady, onTimeout, "stripedigitalwallet");
+    vi.advanceTimersByTime(10000);
+
+    expect(onReady).not.toHaveBeenCalled();
+    expect(onTimeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the first-page watch independent of the selected method", () => {
+    document.body.innerHTML = `
+      <div id="en__digitalWallet">
+        <div id="en__digitalWallet__stripeButtons__container"><iframe></iframe></div>
+      </div>
+    `;
+    const onReady = vi.fn();
+
+    regive.waitForDigitalWalletUI(onReady);
+
+    expect(onReady).toHaveBeenCalledTimes(1);
   });
 });
 

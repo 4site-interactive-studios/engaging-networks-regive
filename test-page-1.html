@@ -1015,15 +1015,17 @@
       <div class="en__field en__field--digitalWallet">
         <label class="en__field__label">Digital wallets</label>
         <div id="en__digitalWallet">
-          <iframe title="mock wallet UI" src="about:blank" style="width: 100%; height: 0; border: 0"></iframe>
-          <button type="button" id="harness-wallet-fire">
-            Mock wallet — fire Stripe paymentRequest "paymentmethod"
-          </button>
+          <div id="en__digitalWallet__stripeButtons__container">
+            <iframe title="mock Stripe wallet UI" src="about:blank" style="width: 100%; height: 0; border: 0"></iframe>
+            <button type="button" id="harness-wallet-fire">
+              Mock wallet — fire Stripe paymentRequest "paymentmethod"
+            </button>
+          </div>
           <p class="harness-hint">
-            Regive waits for an iframe (or #chariot-button) inside
-            #en__digitalWallet before relocating this block into the banner. The
-            iframe above satisfies that check; note the component's own CSS hides
-            iframes in the embedded frame, so only the button stays visible here.
+            Regive moves this block into the banner and waits for the detected
+            wallet's own iframe before enabling it. The Stripe iframe above
+            satisfies that check; the component's own CSS hides iframes in the
+            embedded frame, so only the mock button stays visible here.
           </p>
         </div>
       </div>

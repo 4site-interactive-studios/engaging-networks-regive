@@ -528,7 +528,7 @@ Three behaviors have no static equivalent, so the pages simulate them. Each one 
 - **DOM mutations.** Regive re-reads the form whenever the DOM changes, and real Engaging Networks pages change it constantly. The pages stamp a data attribute on the form after any scripted value change, because setting an input's `value` property produces no mutation record on its own.
 - **The iframe URL.** Regive normally rewrites the `/page/<id>/donate/<n>` path back to `/1` to find page 1. These files have no such path, so the panel sets `base-page` to page 1's absolute URL.
 
-The mock wallet block is thinner than the rest. Moving the wallet UI into the banner and attaching the Stripe submit listener both run, but no gateway is involved: a placeholder iframe satisfies the "wallet UI is ready" check, and since the component hides iframes in the embedded frame, only the mock button stays visible.
+The mock wallet block is thinner than the rest. Moving the wallet UI into the banner and attaching the Stripe submit listener both run, but no gateway is involved: a placeholder iframe inside `#en__digitalWallet__stripeButtons__container` satisfies the "wallet UI is ready" check, and since the component hides iframes in the embedded frame, only the mock button stays visible.
 
 ## Development
 
