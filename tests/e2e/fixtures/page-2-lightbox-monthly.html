@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture — Thank You Page (lightbox, monthly regive)</title>
+    <script>
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 2,
+        pageCount: 2,
+        campaignPageId: 12345,
+        clientId: 678,
+      };
+    </script>
+  </head>
+  <body>
+    <div class="en__component">
+      <h1>Thank you for your donation</h1>
+    </div>
+    <!-- The embedded page is one-time only, so the child sends "enabled"
+         and then exits when the monthly frequency cannot be applied -->
+    <regive
+      amount="5,10"
+      heading="Become a monthly donor"
+      frequency="monthly"
+      test="true"
+      lightbox="true"
+    ></regive>
+    <script src="/regive.js"></script>
+  </body>
+</html>

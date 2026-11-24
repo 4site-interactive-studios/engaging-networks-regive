@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture — Thank You Page (animated lightbox, base page)</title>
+    <script>
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 2,
+        pageCount: 2,
+        campaignPageId: 12345,
+        clientId: 678,
+      };
+    </script>
+  </head>
+  <body>
+    <div class="en__component en__component--codeblock">
+      <h1>Thank you for your donation</h1>
+      <!-- The template lives on the base page (/page/24680/donate/1), not
+           on this campaign's page 1 -->
+      <regive
+        amount="7"
+        heading="Give again"
+        theme="motion-calm"
+        base-page="24680"
+        test="true"
+        lightbox="true"
+        lightbox-animate="true"
+      ></regive>
+    </div>
+    <script src="/regive.js"></script>
+  </body>
+</html>

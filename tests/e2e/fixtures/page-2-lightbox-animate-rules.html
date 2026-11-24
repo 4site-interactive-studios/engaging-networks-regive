@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture — Thank You Page (animated lightbox, theme rules)</title>
+    <script>
+      window.pageJson = {
+        pageType: "donation",
+        pageNumber: 2,
+        pageCount: 2,
+        campaignPageId: 12345,
+        clientId: 678,
+      };
+    </script>
+  </head>
+  <body>
+    <div class="en__component en__component--codeblock">
+      <h1>Thank you for your donation</h1>
+      <!-- The $150 gift clears the 100 threshold, so the child renders
+           motion-bold even though the tag names motion-calm -->
+      <regive
+        amount="7"
+        gift-amount="150"
+        heading="Give again"
+        theme="motion-calm"
+        theme-rules="100:motion-bold"
+        test="true"
+        lightbox="true"
+        lightbox-animate="true"
+      ></regive>
+    </div>
+    <script src="/regive.js"></script>
+  </body>
+</html>
