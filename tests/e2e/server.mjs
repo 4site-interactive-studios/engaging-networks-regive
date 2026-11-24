@@ -44,6 +44,10 @@ const routes = [
   // Variant where the "Other" markup is broken: the fallback selector
   // matches a non-radio input - must come before the generic first-page route
   { pattern: /^\/page\/\d+\/withotherbroken\/1$/, file: "fixtures/donate-1-withother-broken.html" },
+  // First donation page with a "CC" payment type radio and a mandatory card
+  // holder name that is hidden until that radio is checked - must come before
+  // the generic first-page route
+  { pattern: /^\/page\/\d+\/cardholder\/1$/, file: "fixtures/donate-1-cardholder.html" },
   // Lightbox first pages - must come before the generic first-page route.
   // /lightboxcaptcha/1 carries a mock reCAPTCHA, /lightboxwallet/1 renders a
   // late digital wallet UI, /lightboxmonthly/1 is one-time only (so a
@@ -78,8 +82,9 @@ const routes = [
   { pattern: /^\/page\/\d+\/lightboxanimatereal\/2$/, file: "fixtures/page-2-lightbox-animate-real.html" },
   // Thank-you page with lightbox-animate but no lightbox
   { pattern: /^\/page\/\d+\/animatenolightbox\/2$/, file: "fixtures/page-2-animate-nolightbox.html" },
-  // Thank-you page with the <regive> tag in normal mode
-  { pattern: /^\/page\/\d+\/donate\/2$/, file: "fixtures/page-2.html" },
+  // Thank-you page with the <regive> tag in normal mode. /cardholder/2 embeds
+  // the "CC" + card holder name page
+  { pattern: /^\/page\/\d+\/(?:donate|cardholder)\/2$/, file: "fixtures/page-2.html" },
   // Thank-you page with the <regive source="original"> tag
   { pattern: /^\/page\/\d+\/original\/2$/, file: "fixtures/page-2-original.html" },
   // Thank-you page with the <regive hide-for-frequency="annual,monthly"> tag
